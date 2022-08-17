@@ -1,7 +1,5 @@
 [![CircleCI](https://circleci.com/gh/giantswarm/aws-network-topology-operator.svg?style=shield)](https://circleci.com/gh/giantswarm/aws-network-topology-operator)
 
-[Read me after cloning this template (GS staff only)](https://intranet.giantswarm.io/docs/dev-and-releng/app-developer-processes/adding_app_to_appcatalog/)
-
 # aws-network-topology-operator chart
 
 Giant Swarm offers a aws-network-topology-operator App which can be installed in workload clusters.
@@ -65,5 +63,3 @@ Not following these limitations will most likely result in a broken deployment.
 - _add limitation_
 
 ## Credit
-
-- {APP HELM REPOSITORY}
