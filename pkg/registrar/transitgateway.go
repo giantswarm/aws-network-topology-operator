@@ -53,6 +53,8 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 	ctx = context.WithValue(ctx, clusterNameContextKey, cluster.ObjectMeta.Name)
 	logger := r.getLogger(ctx)
 
+	gatewayID := annotations.GetNetworkTopologyTransitGatewayID(cluster)
+
 	switch val := annotations.GetAnnotation(cluster, annotations.NetworkTopologyModeAnnotation); val {
 	case "":
 		// If no value currently set, we'll set to the default of 'None"
@@ -75,8 +77,6 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeUserManaged)
 
 	case annotations.NetworkTopologyModeGiantSwarmManaged:
-		gatewayID := annotations.GetNetworkTopologyTransitGatewayID(cluster)
-
 		var err error
 		var tgw *types.TransitGateway
 
@@ -138,16 +138,29 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) error {
 	logger := r.getLogger(ctx)
 
-	if annotations.IsNetworkTopologyModeGiantSwarmManaged(cluster) {
-		logger.Info("Network topology mode is GiantSwarmManaged")
+	gatewayID := annotations.GetNetworkTopologyTransitGatewayID(cluster)
 
-		// TODO: Check if TGW needs deleting
+	switch val := annotations.GetAnnotation(cluster, annotations.NetworkTopologyModeAnnotation); val {
+	case annotations.NetworkTopologyModeNone:
+		// TODO: Handle `None` topology mode
+		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeNone)
 
-		logger.Info("Done unregistering TransitGateway")
-	} else {
-		logger.Info("Network topology mode is not GiantSwarmManaged, nothing to do")
+	case annotations.NetworkTopologyModeUserManaged:
+		// TODO: Handle `UserManaged` mode
+		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeUserManaged)
+
+	case annotations.NetworkTopologyModeGiantSwarmManaged:
+		if err := r.detachTransitGateway(ctx, &gatewayID, cluster); err != nil {
+			return err
+		}
+
+	default:
+		err := fmt.Errorf("invalid NetworkTopologyMode value")
+		logger.Error(err, "Unexpected NetworkTopologyMode annotation value found on cluster", "value", val)
+		return err
 	}
 
+	logger.Info("Done unregistering TransitGateway")
 	return nil
 }
 
@@ -264,5 +277,52 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	}
 
 	logger.Info("TransitGateway attached to VPC", "vpcID", vpcID, "transitGatewayID", gatewayID, "transitGatewayAttachmentId", output.TransitGatewayVpcAttachment.TransitGatewayAttachmentId)
+	return nil
+}
+
+func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *string, cluster *capi.Cluster) error {
+	logger := r.getLogger(ctx)
+
+	clusterNamespaceName := k8stypes.NamespacedName{
+		Name:      cluster.Spec.InfrastructureRef.Name,
+		Namespace: cluster.Spec.InfrastructureRef.Namespace,
+	}
+	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, clusterNamespaceName)
+	if err != nil {
+		logger.Error(err, "Failed to get AWSCluster for Cluster")
+		return err
+	}
+
+	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
+
+	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("transit-gateway-id"),
+				Values: []string{*gatewayID},
+			},
+			{
+				Name:   aws.String("vpc-id"),
+				Values: []string{vpcID},
+			},
+		},
+	}
+
+	attachments, err := r.transitGatewayClient.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
+	if err != nil {
+		return err
+	}
+
+	for _, tgwAttachment := range attachments.TransitGatewayVpcAttachments {
+		_, err := r.transitGatewayClient.DeleteTransitGatewayVpcAttachment(ctx, &ec2.DeleteTransitGatewayVpcAttachmentInput{
+			TransitGatewayAttachmentId: tgwAttachment.TransitGatewayAttachmentId,
+		})
+		if err != nil {
+			logger.Error(err, "Failed to delete TransitGatewayAttachment", "transitGatewayID", gatewayID, "vpcID", vpcID, "transitGatewayAttachmentID", tgwAttachment.TransitGatewayAttachmentId)
+			return err
+		}
+	}
+
+	logger.Info("TransitGateway detached from VPC", "vpcID", vpcID, "transitGatewayID", gatewayID)
 	return nil
 }
