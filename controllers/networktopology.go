@@ -15,7 +15,7 @@ import (
 
 const FinalizerNetTop = "network-topology.finalizers.giantswarm.io"
 
-//counterfeiter:generate . GCPClusterClient
+//counterfeiter:generate . ClusterClient
 type ClusterClient interface {
 	Get(context.Context, types.NamespacedName) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capi.Cluster, string) error
