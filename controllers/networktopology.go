@@ -2,10 +2,12 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
 	"github.com/giantswarm/microerror"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/annotations"
@@ -54,7 +56,7 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	cluster, err := r.client.Get(ctx, req.NamespacedName)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			logger.Info("Cluster no longer exists")
 			return ctrl.Result{}, nil
 		}
@@ -79,9 +81,12 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, Cluster
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	for _, registrar := range r.registrars {
-		err = registrar.Register(ctx, Cluster)
+	for _, reg := range r.registrars {
+		err = reg.Register(ctx, Cluster)
 		if err != nil {
+			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
+				return ctrl.Result{Requeue: false}, nil
+			}
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}

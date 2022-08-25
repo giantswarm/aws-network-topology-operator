@@ -13,22 +13,13 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	awsclient "github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 )
 
 type contextKey string
 
 var clusterNameContextKey contextKey = "clusterName"
-
-//counterfeiter:generate . TransitGatewayClient
-type TransitGatewayClient interface {
-	CreateTransitGateway(ctx context.Context, params *ec2.CreateTransitGatewayInput, optFns ...func(*ec2.Options)) (*ec2.CreateTransitGatewayOutput, error)
-	CreateTransitGatewayVpcAttachment(ctx context.Context, params *ec2.CreateTransitGatewayVpcAttachmentInput, optFns ...func(*ec2.Options)) (*ec2.CreateTransitGatewayVpcAttachmentOutput, error)
-	DeleteTransitGateway(ctx context.Context, params *ec2.DeleteTransitGatewayInput, optFns ...func(*ec2.Options)) (*ec2.DeleteTransitGatewayOutput, error)
-	DeleteTransitGatewayVpcAttachment(ctx context.Context, params *ec2.DeleteTransitGatewayVpcAttachmentInput, optFns ...func(*ec2.Options)) (*ec2.DeleteTransitGatewayVpcAttachmentOutput, error)
-	DescribeTransitGateways(ctx context.Context, params *ec2.DescribeTransitGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error)
-	DescribeTransitGatewayVpcAttachments(ctx context.Context, params *ec2.DescribeTransitGatewayVpcAttachmentsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error)
-}
 
 //counterfeiter:generate . ClusterClient
 type ClusterClient interface {
@@ -39,13 +30,14 @@ type ClusterClient interface {
 }
 
 type TransitGateway struct {
-	transitGatewayClient TransitGatewayClient
+	transitGatewayClient awsclient.TransitGatewayClient
 	clusterClient        ClusterClient
 }
 
-func NewTransitGateway(transitGatewayClient TransitGatewayClient) *TransitGateway {
+func NewTransitGateway(transitGatewayClient awsclient.TransitGatewayClient, clusterClient ClusterClient) *TransitGateway {
 	return &TransitGateway{
 		transitGatewayClient: transitGatewayClient,
+		clusterClient:        clusterClient,
 	}
 }
 
@@ -71,10 +63,12 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 	case annotations.NetworkTopologyModeNone:
 		// TODO: Handle `None` topology mode
 		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeNone)
+		return &ModeNotSupportedError{Mode: val}
 
 	case annotations.NetworkTopologyModeUserManaged:
 		// TODO: Handle `UserManaged` mode
 		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeUserManaged)
+		return &ModeNotSupportedError{Mode: val}
 
 	case annotations.NetworkTopologyModeGiantSwarmManaged:
 		var err error

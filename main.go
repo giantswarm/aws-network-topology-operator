@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/giantswarm/aws-network-topology-operator/controllers"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
 	//+kubebuilder:scaffold:imports
@@ -110,7 +111,7 @@ func main() {
 		setupLog.Error(err, "unable to load AWS SDK config")
 		os.Exit(1)
 	}
-	ec2Service := ec2.NewFromConfig(cfg)
+	ec2Service := aws.NewEC2Client(ec2.NewFromConfig(cfg))
 
 	managementCluster := types.NamespacedName{
 		Name:      managementClusterName,
@@ -119,7 +120,7 @@ func main() {
 	client := k8sclient.NewCluster(mgr.GetClient(), managementCluster)
 
 	registrars := []controllers.Registrar{
-		registrar.NewTransitGateway(ec2Service),
+		registrar.NewTransitGateway(ec2Service, client),
 	}
 	controller := controllers.NewNetworkTopologyReconciler(client, registrars)
 	err = controller.SetupWithManager(mgr)
