@@ -11,6 +11,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	awsclient "github.com/giantswarm/aws-network-topology-operator/pkg/aws"
@@ -23,7 +24,7 @@ var clusterNameContextKey contextKey = "clusterName"
 
 //counterfeiter:generate . ClusterClient
 type ClusterClient interface {
-	Save(ctx context.Context, cluster *capi.Cluster) (*capi.Cluster, error)
+	Patch(ctx context.Context, cluster *capi.Cluster, patch client.Patch) (*capi.Cluster, error)
 	GetManagementCluster(ctx context.Context) (*capi.Cluster, error)
 	GetAWSCluster(ctx context.Context, namespacedName k8stypes.NamespacedName) (*capa.AWSCluster, error)
 	IsManagementCluster(ctx context.Context, cluster *capi.Cluster) bool
@@ -51,10 +52,12 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 	case "":
 		// If no value currently set, we'll set to the default of 'None"
 		logger.Info("NetworkTopologyMode is currently unset, setting to the default of 'None'")
+
+		baseCluster := cluster.DeepCopy()
 		annotations.AddAnnotations(cluster, map[string]string{
 			annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeNone,
 		})
-		if _, err := r.clusterClient.Save(ctx, cluster); err != nil {
+		if _, err := r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
 			logger.Error(err, "Failed to save cluster resource")
 			return err
 		}
@@ -108,8 +111,9 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 		}
 
 		// Ensure TGW ID is saved back to the current cluster
+		baseCluster := cluster.DeepCopy()
 		annotations.SetNetworkTopologyTransitGatewayID(cluster, *tgw.TransitGatewayId)
-		if cluster, err = r.clusterClient.Save(ctx, cluster); err != nil {
+		if cluster, err = r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
 			logger.Error(err, "Failed to save cluster resource")
 			return err
 		}

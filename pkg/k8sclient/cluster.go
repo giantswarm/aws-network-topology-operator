@@ -54,9 +54,9 @@ func (g *Cluster) GetAWSCluster(ctx context.Context, namespacedName types.Namesp
 	return cluster, microerror.Mask(err)
 }
 
-// Save persists changes to the given Cluster
-func (g *Cluster) Save(ctx context.Context, cluster *capi.Cluster) (*capi.Cluster, error) {
-	err := g.client.Update(ctx, cluster, &client.UpdateOptions{})
+// Patch applies the given patches to the cluster
+func (g *Cluster) Patch(ctx context.Context, cluster *capi.Cluster, patch client.Patch) (*capi.Cluster, error) {
+	err := g.client.Patch(ctx, cluster, patch, &client.PatchOptions{})
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
