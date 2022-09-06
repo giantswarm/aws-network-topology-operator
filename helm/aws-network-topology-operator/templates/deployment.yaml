@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "resource.default.name"  . }}
+  namespace: {{ include "resource.default.namespace"  . }}
+  labels:
+  {{- include "labels.common" . | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+  {{- include "labels.selector" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        releaseRevision: {{ .Release.Revision | quote }}
+      labels:
+    {{- include "labels.selector" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "resource.default.name"  . }}
+      securityContext:
+        runAsUser: {{ .Values.pod.user.id }}
+        runAsGroup: {{ .Values.pod.group.id }}
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+          command:
+            - /manager
+          args:
+            - --management-cluster-name={{ required "The name of the management cluster is required" .Values.managementCluster.name }}
+            - --management-cluster-namespace={{ required "The namespace of the management cluster is required" .Values.managementCluster.namespace }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 50Mi
+            limits:
+              cpu: 100m
+              memory: 80Mi

@@ -7,4 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Helm chart
+
 [Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/tree/main
