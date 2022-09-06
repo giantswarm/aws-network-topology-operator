@@ -1,6 +1,3 @@
-name: aws-network-topology-operator
-serviceType: managed
-
 project:
   branch: "[[ .Branch ]]"
   commit: "[[ .SHA ]]"
@@ -8,5 +5,9 @@ project:
 image:
   registry: quay.io
   name: giantswarm/aws-network-topology-operator
-  tag: v0.0.1
+  tag: "[[ .Version ]]"
   pullPolicy: IfNotPresent
+
+managementCluster:
+  name: ""
+  namespace: ""

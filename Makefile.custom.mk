@@ -80,6 +80,15 @@ undeploy: ## Undeploy controller from the K8s  specified in ~/.kube/config.
 		--namespace giantswarm \
 		aws-network-topology-operator
 
+##@ App
+
+ensure-schema-gen:
+	@helm schema-gen --help &>/dev/null || helm plugin install https://github.com/mihaisee/helm-schema-gen.git
+
+.PHONY: schema-gen
+schema-gen: ensure-schema-gen ## Generates the values schema file
+	@cd helm/aws-network-topology-operator && helm schema-gen values.yaml > values.schema.json
+
 ##@ Build Dependencies
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
