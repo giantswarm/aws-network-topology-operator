@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+* Refactored / cleaned up some code
+
+### Added
+
+* Tests for checking paused cluster state
+* Test for checking registrars get called
+* Test for cluster not existing
+
 ## [0.0.1] - 2022-09-06
 
 ### Added

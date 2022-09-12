@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
 	"github.com/giantswarm/microerror"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,6 +12,8 @@ import (
 	"sigs.k8s.io/cluster-api/util/annotations"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
 )
 
 const FinalizerNetTop = "network-topology.finalizers.giantswarm.io"
@@ -64,8 +65,8 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if annotations.IsPaused(cluster, cluster) {
-		logger.Info("Infrastructure or core cluster is marked as paused. Won't reconcile")
-		return ctrl.Result{}, nil
+		logger.Info("Core cluster is marked as paused. Won't reconcile")
+		return ctrl.Result{Requeue: false}, nil
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
@@ -75,14 +76,14 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	return r.reconcileNormal(ctx, cluster)
 }
 
-func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, Cluster *capi.Cluster) (ctrl.Result, error) {
-	err := r.client.AddFinalizer(ctx, Cluster, FinalizerNetTop)
+func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
+	err := r.client.AddFinalizer(ctx, cluster, FinalizerNetTop)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
 	for _, reg := range r.registrars {
-		err = reg.Register(ctx, Cluster)
+		err = reg.Register(ctx, cluster)
 		if err != nil {
 			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
 				return ctrl.Result{Requeue: false}, nil
@@ -94,17 +95,17 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, Cluster
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, nil
 }
 
-func (r *NetworkTopologyReconciler) reconcileDelete(ctx context.Context, Cluster *capi.Cluster) (ctrl.Result, error) {
+func (r *NetworkTopologyReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
 	for i := range r.registrars {
 		registrar := r.registrars[len(r.registrars)-1-i]
 
-		err := registrar.Unregister(ctx, Cluster)
+		err := registrar.Unregister(ctx, cluster)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}
 
-	err := r.client.RemoveFinalizer(ctx, Cluster, FinalizerNetTop)
+	err := r.client.RemoveFinalizer(ctx, cluster, FinalizerNetTop)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
