@@ -37,6 +37,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 		reconciler    *controllers.NetworkTopologyReconciler
 		clusterClient ClusterClient
+		fakeRegistrar *controllersfakes.FakeRegistrar
 
 		transitGatewayID = "abc-123"
 
@@ -61,10 +62,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		}
 		clusterClient = k8sclient.NewCluster(k8sClient, mc)
 
+		fakeRegistrar = new(controllersfakes.FakeRegistrar)
 		reconciler = controllers.NewNetworkTopologyReconciler(
 			clusterClient,
 			[]controllers.Registrar{
-				new(controllersfakes.FakeRegistrar),
+				fakeRegistrar,
 			},
 		)
 
@@ -150,7 +152,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 	JustBeforeEach(func() {
 		result, reconcileErr = reconciler.Reconcile(ctx, request)
-		// _, _ = reconciler.Reconcile(ctx, request)
 	})
 
 	It("adds a finalizer to the cluster", func() {
@@ -159,6 +160,12 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(actualCluster.Finalizers).To(ContainElement(controllers.FinalizerNetTop))
+	})
+
+	It("uses the registrars to register the records", func() {
+		Expect(fakeRegistrar.RegisterCallCount()).To(Equal(1))
+		_, actualCluster := fakeRegistrar.RegisterArgsForCall(0)
+		Expect(actualCluster.ObjectMeta.UID).To(Equal(cluster.ObjectMeta.UID))
 	})
 
 	When("the cluster doesn't have the topology mode annotation", func() {
@@ -350,6 +357,37 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		It("does requeue the event", func() {
 			Expect(result.Requeue).To(BeTrue())
 			Expect(result.RequeueAfter).ToNot(BeZero())
+			Expect(reconcileErr).NotTo(HaveOccurred())
+		})
+	})
+
+	When("the cluster does not exist", func() {
+		BeforeEach(func() {
+			request = ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "not-the-cluster",
+					Namespace: namespace,
+				},
+			}
+		})
+
+		It("does not requeue the event", func() {
+			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
+			Expect(reconcileErr).NotTo(HaveOccurred())
+		})
+	})
+
+	When("the cluster is paused", func() {
+		BeforeEach(func() {
+			patchedCluster := cluster.DeepCopy()
+			patchedCluster.Spec.Paused = true
+			Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
+		})
+
+		It("does not reconcile", func() {
+			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
 	})
