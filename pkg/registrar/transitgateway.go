@@ -187,9 +187,8 @@ func (r *TransitGateway) getTransitGateway(ctx context.Context, gatewayID string
 			return tgw, err
 		} else if len(describeOutput.TransitGateways) == 1 {
 			tgw = &describeOutput.TransitGateways[0]
+			logger.Info("Got TransitGateway", "transitGatewayID", tgw.TransitGatewayId)
 		}
-
-		logger.Info("Got TransitGateway", "transitGatewayID", tgw.TransitGatewayId)
 	}
 
 	return tgw, nil
@@ -228,8 +227,9 @@ func (r *TransitGateway) getOrCreateTransitGateway(ctx context.Context, gatewayI
 			return nil, err
 		}
 
+		tgw = output.TransitGateway
+
 		logger.Info("Created new TransitGateway", "transitGatewayID", tgw.TransitGatewayId)
-		return output.TransitGateway, nil
 	}
 
 	return tgw, nil
@@ -253,28 +253,49 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
 		subnets = append(subnets, s.ID)
 	}
-	output, err := r.transitGatewayClient.CreateTransitGatewayVpcAttachment(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
-		TransitGatewayId: gatewayID,
-		VpcId:            &vpcID,
-		SubnetIds:        subnets,
-		TagSpecifications: []types.TagSpecification{
+
+	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+		Filters: []types.Filter{
 			{
-				ResourceType: types.ResourceTypeTransitGateway,
-				Tags: []types.Tag{
-					{
-						Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", ctx.Value(clusterNameContextKey))),
-						Value: aws.String("owned"),
-					},
-				},
+				Name:   aws.String("transit-gateway-id"),
+				Values: []string{*gatewayID},
+			},
+			{
+				Name:   aws.String("vpc-id"),
+				Values: []string{vpcID},
 			},
 		},
-	})
-
+	}
+	attachments, err := r.transitGatewayClient.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
 	if err != nil {
 		return err
 	}
 
-	logger.Info("TransitGateway attached to VPC", "vpcID", vpcID, "transitGatewayID", gatewayID, "transitGatewayAttachmentId", output.TransitGatewayVpcAttachment.TransitGatewayAttachmentId)
+	if attachments != nil && len(attachments.TransitGatewayVpcAttachments) == 0 {
+		output, err := r.transitGatewayClient.CreateTransitGatewayVpcAttachment(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
+			TransitGatewayId: gatewayID,
+			VpcId:            &vpcID,
+			SubnetIds:        subnets,
+			TagSpecifications: []types.TagSpecification{
+				{
+					ResourceType: types.ResourceTypeTransitGateway,
+					Tags: []types.Tag{
+						{
+							Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", ctx.Value(clusterNameContextKey))),
+							Value: aws.String("owned"),
+						},
+					},
+				},
+			},
+		})
+
+		if err != nil {
+			return err
+		}
+
+		logger.Info("TransitGateway attached to VPC", "vpcID", vpcID, "transitGatewayID", gatewayID, "transitGatewayAttachmentId", output.TransitGatewayVpcAttachment.TransitGatewayAttachmentId)
+	}
+
 	return nil
 }
 

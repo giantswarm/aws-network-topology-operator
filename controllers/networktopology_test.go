@@ -2,9 +2,11 @@ package controllers_test
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	awstypes "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go/aws"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -35,11 +37,14 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 	var (
 		ctx context.Context
 
-		reconciler    *controllers.NetworkTopologyReconciler
-		clusterClient ClusterClient
-		fakeRegistrar *controllersfakes.FakeRegistrar
+		reconciler           *controllers.NetworkTopologyReconciler
+		clusterClient        ClusterClient
+		fakeRegistrar        *controllersfakes.FakeRegistrar
+		transitGatewayClient *awsfakes.FakeTransitGatewayClient
 
 		transitGatewayID = "abc-123"
+		mcVPCId          = "vpc-123"
+		wcVPCId          = "vpc-987"
 
 		cluster    *capi.Cluster
 		awsCluster *capa.AWSCluster
@@ -51,6 +56,49 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		request      ctrl.Request
 		reconcileErr error
 	)
+
+	var newCluster = func(name, namespace string, annotations map[string]string, vpcID string) (*capi.Cluster, *capa.AWSCluster) {
+		awsCluster := &capa.AWSCluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        name,
+				Namespace:   namespace,
+				Annotations: map[string]string{},
+			},
+			Spec: capa.AWSClusterSpec{
+				NetworkSpec: capa.NetworkSpec{
+					VPC: capa.VPCSpec{
+						ID: vpcID,
+					},
+				},
+			},
+		}
+		cluster := &capi.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        name,
+				Namespace:   namespace,
+				Annotations: annotations,
+			},
+			Spec: capi.ClusterSpec{
+				InfrastructureRef: &v1.ObjectReference{
+					Kind:       awsCluster.Kind,
+					APIVersion: awsCluster.APIVersion,
+					Namespace:  awsCluster.ObjectMeta.Namespace,
+					Name:       awsCluster.ObjectMeta.Name,
+				},
+			},
+		}
+
+		Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
+		tests.PatchAWSClusterStatus(k8sClient, awsCluster, capa.AWSClusterStatus{
+			Ready: true,
+		})
+		Expect(k8sClient.Create(ctx, cluster)).To(Succeed())
+		tests.PatchClusterStatus(k8sClient, cluster, capi.ClusterStatus{
+			InfrastructureReady: true,
+		})
+
+		return cluster, awsCluster
+	}
 
 	BeforeEach(func() {
 		logger := zap.New(zap.WriteTo(GinkgoWriter))
@@ -77,7 +125,13 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Namespace:   namespace,
 					Annotations: map[string]string{},
 				},
-				Spec: capa.AWSClusterSpec{},
+				Spec: capa.AWSClusterSpec{
+					NetworkSpec: capa.NetworkSpec{
+						VPC: capa.VPCSpec{
+							ID: wcVPCId,
+						},
+					},
+				},
 			}
 			Expect(k8sClient.Create(ctx, awsCluster)).To(Succeed())
 			tests.PatchAWSClusterStatus(k8sClient, awsCluster, capa.AWSClusterStatus{
@@ -112,7 +166,13 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Namespace:   mc.Namespace,
 					Annotations: map[string]string{},
 				},
-				Spec: capa.AWSClusterSpec{},
+				Spec: capa.AWSClusterSpec{
+					NetworkSpec: capa.NetworkSpec{
+						VPC: capa.VPCSpec{
+							ID: mcVPCId,
+						},
+					},
+				},
 			}
 			Expect(k8sClient.Create(ctx, managementAWSCluster)).To(Succeed())
 			tests.PatchAWSClusterStatus(k8sClient, managementAWSCluster, capa.AWSClusterStatus{
@@ -295,7 +355,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 	When("the cluster topology mode annotation is set to 'GiantSwarmManaged'", func() {
 		BeforeEach(func() {
-			transitGatewayClient := new(awsfakes.FakeTransitGatewayClient)
+			transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
 
 			transitGatewayClient.DescribeTransitGatewaysReturns(
 				&ec2.DescribeTransitGatewaysOutput{
@@ -359,6 +419,621 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(result.RequeueAfter).ToNot(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
+
+		When("the cluster is an Management Cluster", func() {
+
+			When("the cluster is new", func() {
+				BeforeEach(func() {
+					mcCluster, mcAWSCluster := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+						},
+						nil,
+					)
+
+					transitGatewayClient.CreateTransitGatewayReturns(
+						&ec2.CreateTransitGatewayOutput{
+							TransitGateway: &awstypes.TransitGateway{
+								TransitGatewayId: &transitGatewayID,
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+						&ec2.CreateTransitGatewayVpcAttachmentOutput{
+							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      mcCluster.ObjectMeta.Name,
+							Namespace: mcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should create a new transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(1))
+
+					_, payload, _ := transitGatewayClient.CreateTransitGatewayArgsForCall(0)
+					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
+						ResourceType: awstypes.ResourceTypeTransitGateway,
+						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
+								Value: aws.String("owned"),
+							},
+						},
+					}))
+				})
+
+				It("should create a transit gateway attachment", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+
+					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
+						ResourceType: awstypes.ResourceTypeTransitGateway,
+						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
+								Value: aws.String("owned"),
+							},
+						},
+					}))
+					Expect(*payload.VpcId).To(Equal(mcVPCId))
+				})
+			})
+
+			When("the cluster has an existing transit gateway but no attachment", func() {
+				BeforeEach(func() {
+					mcCluster, mcAWSCluster := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{TransitGatewayId: &transitGatewayID},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+						},
+						nil,
+					)
+
+					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+						&ec2.CreateTransitGatewayVpcAttachmentOutput{
+							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      mcCluster.ObjectMeta.Name,
+							Namespace: mcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should not create a new transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+				})
+
+				It("should create a transit gateway attachment", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+
+					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
+						ResourceType: awstypes.ResourceTypeTransitGateway,
+						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
+								Value: aws.String("owned"),
+							},
+						},
+					}))
+					Expect(*payload.VpcId).To(Equal(mcVPCId))
+				})
+			})
+
+			When("the cluster has an existing transit gateway and existing attachment", func() {
+				BeforeEach(func() {
+					mcCluster, mcAWSCluster := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{TransitGatewayId: &transitGatewayID},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+								{
+									TransitGatewayId:           &transitGatewayID,
+									TransitGatewayAttachmentId: &transitGatewayID,
+									VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
+								},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+						nil,
+						fmt.Errorf("Conflict"),
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      mcCluster.ObjectMeta.Name,
+							Namespace: mcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should not create a new transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+				})
+
+				It("should not create a transit gateway attachment", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				})
+			})
+
+		})
+
+		When("the cluster is a Workload Cluster", func() {
+			When("the cluster is new", func() {
+				BeforeEach(func() {
+					wcCluster, wcAWSCluster := newCluster(
+						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+						},
+						wcVPCId,
+					)
+
+					mcCluster, _ := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{TransitGatewayId: &transitGatewayID},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+						},
+						nil,
+					)
+
+					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+						&ec2.CreateTransitGatewayVpcAttachmentOutput{
+							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      wcCluster.ObjectMeta.Name,
+							Namespace: wcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should not create a new transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+				})
+
+				It("should create a transit gateway attachment", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+
+					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
+						ResourceType: awstypes.ResourceTypeTransitGateway,
+						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
+								Value: aws.String("owned"),
+							},
+						},
+					}))
+					Expect(*payload.VpcId).To(Equal(wcVPCId))
+				})
+
+			})
+
+			When("the cluster has an existing transit gateway but no attachment", func() {
+				BeforeEach(func() {
+					wcCluster, wcAWSCluster := newCluster(
+						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						wcVPCId,
+					)
+
+					mcCluster, _ := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{TransitGatewayId: &transitGatewayID},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+						},
+						nil,
+					)
+
+					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+						&ec2.CreateTransitGatewayVpcAttachmentOutput{
+							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      wcCluster.ObjectMeta.Name,
+							Namespace: wcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should not create a new transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+				})
+
+				It("should create a transit gateway attachment", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+
+					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
+						ResourceType: awstypes.ResourceTypeTransitGateway,
+						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
+								Value: aws.String("owned"),
+							},
+						},
+					}))
+					Expect(*payload.VpcId).To(Equal(wcVPCId))
+				})
+			})
+
+			When("the cluster has an existing transit gateway and existing attachment", func() {
+				BeforeEach(func() {
+					wcCluster, wcAWSCluster := newCluster(
+						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						wcVPCId,
+					)
+
+					mcCluster, _ := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{TransitGatewayId: &transitGatewayID},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+								{
+									TransitGatewayId:           &transitGatewayID,
+									TransitGatewayAttachmentId: &transitGatewayID,
+									VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+								},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+						nil,
+						fmt.Errorf("Conflict"),
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      wcCluster.ObjectMeta.Name,
+							Namespace: wcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should not create a new transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+				})
+
+				It("should create a transit gateway attachment", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				})
+			})
+
+			When("the management cluster annotation is set to 'None'", func() {
+				BeforeEach(func() {
+					wcCluster, _ := newCluster(
+						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+						},
+						wcVPCId,
+					)
+
+					mcCluster, _ := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeNone,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      wcCluster.ObjectMeta.Name,
+							Namespace: wcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should return an error", func() {
+					Expect(reconcileErr).To(HaveOccurred())
+					Expect(reconcileErr.Error()).To(ContainSubstring("management cluster doesn't have a TGW specified"))
+					Expect(result.Requeue).To(BeTrue())
+				})
+
+			})
+
+			When("the a transit gateway matching the ID doesn't exist", func() {
+				BeforeEach(func() {
+					wcCluster, _ := newCluster(
+						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: "not-exist",
+						},
+						wcVPCId,
+					)
+
+					mcCluster, _ := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      wcCluster.ObjectMeta.Name,
+							Namespace: wcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should return an error", func() {
+					Expect(reconcileErr).To(HaveOccurred())
+					Expect(reconcileErr.Error()).To(ContainSubstring("failed to find TransitGateway for provided ID"))
+					Expect(result.Requeue).To(BeTrue())
+				})
+			})
+		})
 	})
 
 	When("the cluster does not exist", func() {
@@ -391,5 +1066,4 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
 	})
-
 })
