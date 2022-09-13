@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Tests for checking paused cluster state
 * Test for checking registrars get called
 * Test for cluster not existing
+* Tests to cover creation of TGW and attachments
 
 ## [0.0.1] - 2022-09-06
 

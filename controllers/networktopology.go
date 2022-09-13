@@ -66,7 +66,7 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	if annotations.IsPaused(cluster, cluster) {
 		logger.Info("Core cluster is marked as paused. Won't reconcile")
-		return ctrl.Result{Requeue: false}, nil
+		return ctrl.Result{}, nil
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
@@ -88,7 +88,7 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
 				return ctrl.Result{Requeue: false}, nil
 			}
-			return ctrl.Result{}, microerror.Mask(err)
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, microerror.Mask(err)
 		}
 	}
 
