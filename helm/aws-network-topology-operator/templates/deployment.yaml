@@ -25,7 +25,8 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
           command:
             - /manager
           args:
