@@ -11,3 +11,9 @@ image:
 managementCluster:
   name: ""
   namespace: ""
+
+pod:
+  user:
+    id: "65532"
+  group:
+    id: "65532"

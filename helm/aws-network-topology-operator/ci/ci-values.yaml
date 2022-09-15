@@ -1,0 +1,3 @@
+managementCluster:
+  name: test
+  namespace: test
