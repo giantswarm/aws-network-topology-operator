@@ -125,7 +125,7 @@ func main() {
 	controller := controllers.NewNetworkTopologyReconciler(client, registrars)
 	err = controller.SetupWithManager(mgr)
 	if err != nil {
-		setupLog.Error(err, "failed to setup controller", "controller", "GCPCluster")
+		setupLog.Error(err, "failed to setup controller", "controller", "Cluster")
 		os.Exit(1)
 	}
 
