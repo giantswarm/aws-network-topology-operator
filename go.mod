@@ -2,6 +2,13 @@ module github.com/giantswarm/aws-network-topology-operator
 
 go 1.18
 
+replace (
+	// Fix non CVE vulnerability: sonatype-2021-1401 in miekg/dns v1.0.14
+	github.com/miekg/dns => github.com/miekg/dns v1.1.50
+	// Fix non CVE vulnerability: sonatype-2019-0890 in pkg/sftp v1.10.1
+	github.com/pkg/sftp => github.com/pkg/sftp v1.13.5
+)
+
 require (
 	github.com/aws/aws-sdk-go v1.44.80
 	github.com/aws/aws-sdk-go-v2/config v1.17.1
