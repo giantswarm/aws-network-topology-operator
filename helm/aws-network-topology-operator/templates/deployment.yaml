@@ -30,8 +30,12 @@ spec:
           command:
             - /manager
           args:
+            - --enable-leader-election
             - --management-cluster-name={{ required "The name of the management cluster is required" .Values.managementCluster.name }}
             - --management-cluster-namespace={{ required "The namespace of the management cluster is required" .Values.managementCluster.namespace }}
+          env:
+          - name: AWS_SHARED_CREDENTIALS_FILE
+            value: /home/.aws/credentials
           resources:
             requests:
               cpu: 100m
@@ -39,3 +43,10 @@ spec:
             limits:
               cpu: 100m
               memory: 80Mi
+          volumeMounts:
+          - mountPath: /home/.aws
+            name: credentials
+      volumes:
+      - name: credentials
+        secret:
+          secretName: {{ include "resource.default.name" . }}-aws-credentials

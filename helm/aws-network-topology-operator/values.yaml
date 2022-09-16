@@ -17,3 +17,8 @@ pod:
     id: "65532"
   group:
     id: "65532"
+
+aws:
+  accessKeyID: accesskey
+  secretAccessKey: secretkey
+  region: region
