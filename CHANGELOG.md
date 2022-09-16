@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Typo in leader-elect argument
+
 ## [0.1.0] - 2022-09-16
 
 ### Added
