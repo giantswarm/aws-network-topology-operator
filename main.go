@@ -26,8 +26,6 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -106,18 +104,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		setupLog.Error(err, "unable to load AWS SDK config")
-		os.Exit(1)
-	}
-	ec2Service := aws.NewEC2Client(ec2.NewFromConfig(cfg))
+	ctx := context.TODO()
 
 	managementCluster := types.NamespacedName{
 		Name:      managementClusterName,
 		Namespace: managementClusterNamespace,
 	}
 	client := k8sclient.NewCluster(mgr.GetClient(), managementCluster)
+
+	identity, err := client.GetAWSClusterRoleIdentity(ctx, managementCluster)
+	if err != nil {
+		setupLog.Error(err, "failed to get ClusterRoleIdentity of management cluster")
+		os.Exit(1)
+	}
+	roleARN := identity.Spec.RoleArn
+	ec2Service := aws.NewEC2Client(ctx, roleARN)
 
 	registrars := []controllers.Registrar{
 		registrar.NewTransitGateway(ec2Service, client),
