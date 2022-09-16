@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Initialise AWS client after controller has been started (see https://github.com/kubernetes-sigs/controller-runtime/issues/607)
+
 ## [0.1.3] - 2022-09-16
 
 ### Fixed

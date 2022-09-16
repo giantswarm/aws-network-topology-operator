@@ -9,7 +9,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
 )
 
 //counterfeiter:generate . TransitGatewayClient
@@ -23,51 +26,74 @@ type TransitGatewayClient interface {
 }
 
 type EC2Client struct {
-	ec2Client *ec2.Client
+	ctx               context.Context
+	ec2Client         *ec2.Client
+	k8sClient         *k8sclient.Cluster
+	managementCluster types.NamespacedName
 }
 
-func NewEC2Client(ctx context.Context, roleARN string) *EC2Client {
-	logger := log.FromContext(ctx)
-
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		logger.Error(err, "unable to load AWS SDK config")
-		os.Exit(1)
-	}
-
-	creds := stscreds.NewAssumeRoleProvider(sts.NewFromConfig(cfg), roleARN)
-
-	cfg, err = config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(aws.NewCredentialsCache(creds)))
-	if err != nil {
-		logger.Error(err, "unable to assume IAM role")
-		os.Exit(1)
-	}
-
+func NewEC2Client(ctx context.Context, k8sClient *k8sclient.Cluster, managementCluster types.NamespacedName) *EC2Client {
 	return &EC2Client{
-		ec2Client: ec2.NewFromConfig(cfg),
+		ctx:               ctx,
+		ec2Client:         nil,
+		k8sClient:         k8sClient,
+		managementCluster: managementCluster,
 	}
+}
+
+func (e *EC2Client) client() *ec2.Client {
+	if e.ec2Client == nil {
+		logger := log.FromContext(e.ctx)
+
+		logger.Info("assuming ClusterRoleIdentity role of management cluster")
+
+		identity, err := e.k8sClient.GetAWSClusterRoleIdentity(e.ctx, e.managementCluster)
+		if err != nil {
+			logger.Error(err, "failed to get ClusterRoleIdentity of management cluster")
+			os.Exit(1)
+		}
+		roleARN := identity.Spec.RoleArn
+
+		cfg, err := config.LoadDefaultConfig(context.TODO())
+		if err != nil {
+			logger.Error(err, "unable to load AWS SDK config")
+			os.Exit(1)
+		}
+
+		creds := stscreds.NewAssumeRoleProvider(sts.NewFromConfig(cfg), roleARN)
+
+		cfg, err = config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(aws.NewCredentialsCache(creds)))
+		if err != nil {
+			logger.Error(err, "unable to assume IAM role")
+			os.Exit(1)
+		}
+
+		e.ec2Client = ec2.NewFromConfig(cfg)
+	}
+
+	return e.ec2Client
 }
 
 func (e *EC2Client) CreateTransitGateway(ctx context.Context, params *ec2.CreateTransitGatewayInput, optFns ...func(*ec2.Options)) (*ec2.CreateTransitGatewayOutput, error) {
-	return e.ec2Client.CreateTransitGateway(ctx, params, optFns...)
+	return e.client().CreateTransitGateway(ctx, params, optFns...)
 }
 
 func (e *EC2Client) CreateTransitGatewayVpcAttachment(ctx context.Context, params *ec2.CreateTransitGatewayVpcAttachmentInput, optFns ...func(*ec2.Options)) (*ec2.CreateTransitGatewayVpcAttachmentOutput, error) {
-	return e.ec2Client.CreateTransitGatewayVpcAttachment(ctx, params, optFns...)
+	return e.client().CreateTransitGatewayVpcAttachment(ctx, params, optFns...)
 }
 
 func (e *EC2Client) DeleteTransitGateway(ctx context.Context, params *ec2.DeleteTransitGatewayInput, optFns ...func(*ec2.Options)) (*ec2.DeleteTransitGatewayOutput, error) {
-	return e.ec2Client.DeleteTransitGateway(ctx, params, optFns...)
+	return e.client().DeleteTransitGateway(ctx, params, optFns...)
 }
 
 func (e *EC2Client) DeleteTransitGatewayVpcAttachment(ctx context.Context, params *ec2.DeleteTransitGatewayVpcAttachmentInput, optFns ...func(*ec2.Options)) (*ec2.DeleteTransitGatewayVpcAttachmentOutput, error) {
-	return e.ec2Client.DeleteTransitGatewayVpcAttachment(ctx, params, optFns...)
+	return e.client().DeleteTransitGatewayVpcAttachment(ctx, params, optFns...)
 }
 
 func (e *EC2Client) DescribeTransitGateways(ctx context.Context, params *ec2.DescribeTransitGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewaysOutput, error) {
-	return e.ec2Client.DescribeTransitGateways(ctx, params, optFns...)
+	return e.client().DescribeTransitGateways(ctx, params, optFns...)
 }
 
 func (e *EC2Client) DescribeTransitGatewayVpcAttachments(ctx context.Context, params *ec2.DescribeTransitGatewayVpcAttachmentsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
-	return e.ec2Client.DescribeTransitGatewayVpcAttachments(ctx, params, optFns...)
+	return e.client().DescribeTransitGatewayVpcAttachments(ctx, params, optFns...)
 }

@@ -114,13 +114,7 @@ func main() {
 	}
 	client := k8sclient.NewCluster(mgr.GetClient(), managementCluster)
 
-	identity, err := client.GetAWSClusterRoleIdentity(ctx, managementCluster)
-	if err != nil {
-		setupLog.Error(err, "failed to get ClusterRoleIdentity of management cluster")
-		os.Exit(1)
-	}
-	roleARN := identity.Spec.RoleArn
-	ec2Service := aws.NewEC2Client(ctx, roleARN)
+	ec2Service := aws.NewEC2Client(ctx, client, managementCluster)
 
 	registrars := []controllers.Registrar{
 		registrar.NewTransitGateway(ec2Service, client),
