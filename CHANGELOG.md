@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2022-09-16
+
 ### Added
 
 - AWS credentials secret
@@ -48,7 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.0.5...v0.1.0
 [0.0.5]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.0.2...v0.0.3
