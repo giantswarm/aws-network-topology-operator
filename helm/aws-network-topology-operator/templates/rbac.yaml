@@ -19,7 +19,7 @@ rules:
   - apiGroups:
       - infrastructure.cluster.x-k8s.io
     resources:
-      - awsclusterroleidentity
+      - awsclusterroleidentities
     verbs:
       - get
       - list
