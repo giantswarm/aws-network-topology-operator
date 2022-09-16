@@ -17,6 +17,13 @@ rules:
       - patch
       - watch
   - apiGroups:
+      - infrastructure.cluster.x-k8s.io
+    resources:
+      - awsclusterroleidentity
+    verbs:
+      - get
+      - list
+  - apiGroups:
       - coordination.k8s.io
     resources:
       - leases

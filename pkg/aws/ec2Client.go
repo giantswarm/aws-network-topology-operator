@@ -2,8 +2,14 @@ package aws
 
 import (
 	"context"
+	"os"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 //counterfeiter:generate . TransitGatewayClient
@@ -20,9 +26,25 @@ type EC2Client struct {
 	ec2Client *ec2.Client
 }
 
-func NewEC2Client(ec2Service *ec2.Client) *EC2Client {
+func NewEC2Client(ctx context.Context, roleARN string) *EC2Client {
+	logger := log.FromContext(ctx)
+
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		logger.Error(err, "unable to load AWS SDK config")
+		os.Exit(1)
+	}
+
+	creds := stscreds.NewAssumeRoleProvider(sts.NewFromConfig(cfg), roleARN)
+
+	cfg, err = config.LoadDefaultConfig(context.TODO(), config.WithCredentialsProvider(aws.NewCredentialsCache(creds)))
+	if err != nil {
+		logger.Error(err, "unable to assume IAM role")
+		os.Exit(1)
+	}
+
 	return &EC2Client{
-		ec2Client: ec2Service,
+		ec2Client: ec2.NewFromConfig(cfg),
 	}
 }
 
