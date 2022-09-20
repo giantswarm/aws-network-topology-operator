@@ -393,15 +393,17 @@ func (r *TransitGateway) addRoute(ctx context.Context, transitGatewayID, cidr *s
 		return err
 	}
 
-	for _, rt := range output.RouteTables {
-		_, err = r.transitGatewayClient.CreateRoute(ctx, &ec2.CreateRouteInput{
-			RouteTableId:         rt.RouteTableId,
-			DestinationCidrBlock: cidr,
-			TransitGatewayId:     transitGatewayID,
-		})
-		if err != nil {
-			logger.Error(err, "Failed to add route to route table")
-			return err
+	if output != nil && len(output.RouteTables) > 0 {
+		for _, rt := range output.RouteTables {
+			_, err = r.transitGatewayClient.CreateRoute(ctx, &ec2.CreateRouteInput{
+				RouteTableId:         rt.RouteTableId,
+				DestinationCidrBlock: cidr,
+				TransitGatewayId:     transitGatewayID,
+			})
+			if err != nil {
+				logger.Error(err, "Failed to add route to route table")
+				return err
+			}
 		}
 	}
 

@@ -509,7 +509,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-						ResourceType: awstypes.ResourceTypeTransitGateway,
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
@@ -593,7 +593,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-						ResourceType: awstypes.ResourceTypeTransitGateway,
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
@@ -760,7 +760,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-						ResourceType: awstypes.ResourceTypeTransitGateway,
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
@@ -854,7 +854,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-						ResourceType: awstypes.ResourceTypeTransitGateway,
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
