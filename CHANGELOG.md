@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Check TGW state before attempting to create attachment
 
+### Fixed
+
+- Use only one subnet per AZ for TGW attachment
+
 ## [0.1.5] - 2022-09-16
 
 ### Fixed

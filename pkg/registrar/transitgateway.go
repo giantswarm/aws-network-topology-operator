@@ -119,10 +119,10 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 		}
 
 		if tgw.State == types.TransitGatewayStateAvailable {
-		if err := r.attachTransitGateway(ctx, tgw.TransitGatewayId, cluster); err != nil {
-			logger.Error(err, "Failed to attach transit gateway to cluster VPC")
-			return err
-		}
+			if err := r.attachTransitGateway(ctx, tgw.TransitGatewayId, cluster); err != nil {
+				logger.Error(err, "Failed to attach transit gateway to cluster VPC")
+				return err
+			}
 		} else {
 			logger.Info("transit gateway not available, skipping attachment for now", "tgwState", tgw.State)
 			return &TransitGatewayNotAvailableError{}
@@ -255,8 +255,8 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 
 	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
 	subnets := []string{}
-	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
-		subnets = append(subnets, s.ID)
+	for _, s := range getPrivateSubnetsByAZ(awsCluster.Spec.NetworkSpec.Subnets) {
+		subnets = append(subnets, s[0].ID)
 	}
 
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
@@ -349,4 +349,20 @@ func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *st
 
 	logger.Info("TransitGateway detached from VPC", "vpcID", vpcID, "transitGatewayID", gatewayID)
 	return nil
+}
+
+func getPrivateSubnetsByAZ(subnets capa.Subnets) map[string]capa.Subnets {
+	subnetMap := map[string]capa.Subnets{}
+
+	for _, subnet := range subnets {
+		if !subnet.IsPublic {
+			if _, ok := subnetMap[subnet.AvailabilityZone]; !ok {
+				subnetMap[subnet.AvailabilityZone] = capa.Subnets{}
+			}
+
+			subnetMap[subnet.AvailabilityZone] = append(subnetMap[subnet.AvailabilityZone], subnet)
+		}
+	}
+
+	return subnetMap
 }
