@@ -118,9 +118,14 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return err
 		}
 
+		if tgw.State == types.TransitGatewayStateAvailable {
 		if err := r.attachTransitGateway(ctx, tgw.TransitGatewayId, cluster); err != nil {
 			logger.Error(err, "Failed to attach transit gateway to cluster VPC")
 			return err
+		}
+		} else {
+			logger.Info("transit gateway not available, skipping attachment for now", "tgwState", tgw.State)
+			return &TransitGatewayNotAvailableError{}
 		}
 
 	default:
