@@ -128,6 +128,21 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return &TransitGatewayNotAvailableError{}
 		}
 
+		// Add route to TGW for WC CIDR to MCs route tables
+		if !r.clusterClient.IsManagementCluster(ctx, cluster) {
+			awsCluster, err := r.getAWSCluster(ctx, cluster)
+			if err != nil {
+				logger.Error(err, "Failed to get AWS cluster")
+				return err
+			}
+
+			err = r.addRoute(ctx, tgw.TransitGatewayId, &awsCluster.Spec.NetworkSpec.VPC.CidrBlock)
+			if err != nil {
+				logger.Error(err, "Failed to add route to WC cluster via TGW")
+				return err
+			}
+		}
+
 	default:
 		err := fmt.Errorf("invalid NetworkTopologyMode value")
 		logger.Error(err, "Unexpected NetworkTopologyMode annotation value found on cluster", "value", val)
@@ -243,11 +258,7 @@ func (r *TransitGateway) getOrCreateTransitGateway(ctx context.Context, gatewayI
 func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *string, cluster *capi.Cluster) error {
 	logger := r.getLogger(ctx)
 
-	clusterNamespaceName := k8stypes.NamespacedName{
-		Name:      cluster.Spec.InfrastructureRef.Name,
-		Namespace: cluster.Spec.InfrastructureRef.Namespace,
-	}
-	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, clusterNamespaceName)
+	awsCluster, err := r.getAWSCluster(ctx, cluster)
 	if err != nil {
 		logger.Error(err, "Failed to get AWSCluster for Cluster")
 		return err
@@ -307,11 +318,7 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *string, cluster *capi.Cluster) error {
 	logger := r.getLogger(ctx)
 
-	clusterNamespaceName := k8stypes.NamespacedName{
-		Name:      cluster.Spec.InfrastructureRef.Name,
-		Namespace: cluster.Spec.InfrastructureRef.Namespace,
-	}
-	awsCluster, err := r.clusterClient.GetAWSCluster(ctx, clusterNamespaceName)
+	awsCluster, err := r.getAWSCluster(ctx, cluster)
 	if err != nil {
 		logger.Error(err, "Failed to get AWSCluster for Cluster")
 		return err
@@ -348,6 +355,56 @@ func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *st
 	}
 
 	logger.Info("TransitGateway detached from VPC", "vpcID", vpcID, "transitGatewayID", gatewayID)
+	return nil
+}
+
+func (r *TransitGateway) getAWSCluster(ctx context.Context, cluster *capi.Cluster) (*capa.AWSCluster, error) {
+	clusterNamespaceName := k8stypes.NamespacedName{
+		Name:      cluster.Spec.InfrastructureRef.Name,
+		Namespace: cluster.Spec.InfrastructureRef.Namespace,
+	}
+	return r.clusterClient.GetAWSCluster(ctx, clusterNamespaceName)
+}
+
+func (r *TransitGateway) addRoute(ctx context.Context, transitGatewayID, cidr *string) error {
+	logger := r.getLogger(ctx)
+	mc, err := r.clusterClient.GetManagementCluster(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to get management cluster")
+		return err
+	}
+	awsCluster, err := r.getAWSCluster(ctx, mc)
+	if err != nil {
+		return err
+	}
+
+	subnets := []string{}
+	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
+		subnets = append(subnets, s.ID)
+	}
+
+	output, err := r.transitGatewayClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+		Filters: []types.Filter{
+			{Name: aws.String("association.subnet-id"), Values: subnets},
+		},
+	})
+	if err != nil {
+		logger.Error(err, "Failed to get route tables")
+		return err
+	}
+
+	for _, rt := range output.RouteTables {
+		_, err = r.transitGatewayClient.CreateRoute(ctx, &ec2.CreateRouteInput{
+			RouteTableId:         rt.RouteTableId,
+			DestinationCidrBlock: cidr,
+			TransitGatewayId:     transitGatewayID,
+		})
+		if err != nil {
+			logger.Error(err, "Failed to add route to route table")
+			return err
+		}
+	}
+
 	return nil
 }
 

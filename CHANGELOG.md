@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Add TGW route to cluster subnet route tables
+
 ## [0.1.7] - 2022-09-20
 
 ### Fixed
