@@ -519,6 +519,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					}))
 					Expect(*payload.VpcId).To(Equal(mcVPCId))
 				})
+
+				It("should not create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
+				})
 			})
 
 			When("the cluster has an existing transit gateway but no attachment", func() {
@@ -603,6 +607,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					}))
 					Expect(*payload.VpcId).To(Equal(mcVPCId))
 				})
+
+				It("should not create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
+				})
 			})
 
 			When("the cluster has an existing transit gateway and existing attachment", func() {
@@ -674,6 +682,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 				It("should not create a transit gateway attachment", func() {
 					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				})
+
+				It("should not create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
 				})
 			})
 
