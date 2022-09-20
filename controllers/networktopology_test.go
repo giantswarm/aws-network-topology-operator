@@ -452,6 +452,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.CreateTransitGatewayOutput{
 							TransitGateway: &awstypes.TransitGateway{
 								TransitGatewayId: &transitGatewayID,
+								State:            awstypes.TransitGatewayStateAvailable,
 							},
 						},
 						nil,
@@ -536,7 +537,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeTransitGatewaysReturns(
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
-								{TransitGatewayId: &transitGatewayID},
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
 							},
 						},
 						nil,
@@ -617,7 +621,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeTransitGatewaysReturns(
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
-								{TransitGatewayId: &transitGatewayID},
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
 							},
 						},
 						nil,
@@ -697,7 +704,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeTransitGatewaysReturns(
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
-								{TransitGatewayId: &transitGatewayID},
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
 							},
 						},
 						nil,
@@ -788,7 +798,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeTransitGatewaysReturns(
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
-								{TransitGatewayId: &transitGatewayID},
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
 							},
 						},
 						nil,
@@ -878,7 +891,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeTransitGatewaysReturns(
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
-								{TransitGatewayId: &transitGatewayID},
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
 							},
 						},
 						nil,
