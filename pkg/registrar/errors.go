@@ -18,3 +18,15 @@ func (e *ModeNotSupportedError) Error() string {
 func (e *ModeNotSupportedError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
+
+type TransitGatewayNotAvailableError struct {
+	error
+}
+
+func (e *TransitGatewayNotAvailableError) Error() string {
+	return "transit gateway not available"
+}
+
+func (e *TransitGatewayNotAvailableError) Is(target error) bool {
+	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}

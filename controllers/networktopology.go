@@ -87,7 +87,10 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 		if err != nil {
 			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
 				return ctrl.Result{Requeue: false}, nil
+			} else if errors.Is(err, &registrar.TransitGatewayNotAvailableError{}) {
+				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
 			}
+
 			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, microerror.Mask(err)
 		}
 	}
