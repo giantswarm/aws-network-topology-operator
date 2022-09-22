@@ -505,7 +505,7 @@ func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.A
 
 	result, err := r.transitGatewayClient.GetManagedPrefixListEntries(ctx, &ec2.GetManagedPrefixListEntriesInput{
 		PrefixListId:  &prefixListID,
-		MaxResults:    aws.Int32(200),
+		MaxResults:    aws.Int32(100),
 		TargetVersion: prefixList.Version,
 	})
 	if err != nil {
