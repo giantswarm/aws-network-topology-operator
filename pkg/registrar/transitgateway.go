@@ -118,8 +118,14 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return err
 		}
 
+		awsCluster, err := r.getAWSCluster(ctx, cluster)
+		if err != nil {
+			logger.Error(err, "Failed to get AWSCluster for Cluster")
+			return err
+		}
+
 		if tgw.State == types.TransitGatewayStateAvailable {
-			if err := r.attachTransitGateway(ctx, tgw.TransitGatewayId, cluster); err != nil {
+			if err := r.attachTransitGateway(ctx, tgw.TransitGatewayId, awsCluster); err != nil {
 				logger.Error(err, "Failed to attach transit gateway to cluster VPC")
 				return err
 			}
@@ -128,19 +134,24 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return &TransitGatewayNotAvailableError{}
 		}
 
-		// Add route to TGW for WC CIDR to MCs route tables
-		if !r.clusterClient.IsManagementCluster(ctx, cluster) {
-			awsCluster, err := r.getAWSCluster(ctx, cluster)
-			if err != nil {
-				logger.Error(err, "Failed to get AWS cluster")
-				return err
-			}
+		prefixListID, err := r.addToPrefixList(ctx, awsCluster)
+		if err != nil {
+			logger.Error(err, "Failed to add CIDR to prefix list")
+			return err
+		}
 
-			err = r.addRoute(ctx, tgw.TransitGatewayId, &awsCluster.Spec.NetworkSpec.VPC.CidrBlock)
-			if err != nil {
-				logger.Error(err, "Failed to add route to WC cluster via TGW")
-				return err
-			}
+		// Ensure TGW ID is saved back to the current cluster
+		baseCluster = cluster.DeepCopy()
+		annotations.SetNetworkTopologyPrefixListID(cluster, prefixListID)
+		if cluster, err = r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
+			logger.Error(err, "Failed to save cluster resource", "cluster", cluster.ObjectMeta.Name)
+			return err
+		}
+
+		err = r.addRoutes(ctx, tgw.TransitGatewayId, &prefixListID, awsCluster)
+		if err != nil {
+			logger.Error(err, "Failed to add route to WC cluster via TGW")
+			return err
 		}
 
 	default:
@@ -168,7 +179,23 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeUserManaged)
 
 	case annotations.NetworkTopologyModeGiantSwarmManaged:
-		if err := r.detachTransitGateway(ctx, &gatewayID, cluster); err != nil {
+		awsCluster, err := r.getAWSCluster(ctx, cluster)
+		if err != nil {
+			return err
+		}
+
+		if err := r.removeFromPrefixList(ctx, awsCluster); err != nil {
+			logger.Error(err, "Failed to remove from prefix list")
+			return err
+		}
+
+		if err := r.removeRoutes(ctx, awsCluster); err != nil {
+			logger.Error(err, "Failed to remove routes from subnet route table")
+			return err
+		}
+
+		if err := r.detachTransitGateway(ctx, &gatewayID, awsCluster); err != nil {
+			logger.Error(err, "Failed to detach transit gateway")
 			return err
 		}
 
@@ -185,6 +212,14 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 func (r *TransitGateway) getLogger(ctx context.Context) logr.Logger {
 	logger := log.FromContext(ctx)
 	return logger.WithName("transitgateway-registrar")
+}
+
+func (r *TransitGateway) getAWSCluster(ctx context.Context, cluster *capi.Cluster) (*capa.AWSCluster, error) {
+	clusterNamespaceName := k8stypes.NamespacedName{
+		Name:      cluster.Spec.InfrastructureRef.Name,
+		Namespace: cluster.Spec.InfrastructureRef.Namespace,
+	}
+	return r.clusterClient.GetAWSCluster(ctx, clusterNamespaceName)
 }
 
 func (r *TransitGateway) getTransitGateway(ctx context.Context, gatewayID string) (*types.TransitGateway, error) {
@@ -255,14 +290,8 @@ func (r *TransitGateway) getOrCreateTransitGateway(ctx context.Context, gatewayI
 	return tgw, nil
 }
 
-func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *string, cluster *capi.Cluster) error {
+func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *string, awsCluster *capa.AWSCluster) error {
 	logger := r.getLogger(ctx)
-
-	awsCluster, err := r.getAWSCluster(ctx, cluster)
-	if err != nil {
-		logger.Error(err, "Failed to get AWSCluster for Cluster")
-		return err
-	}
 
 	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
 	subnets := []string{}
@@ -315,14 +344,8 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	return nil
 }
 
-func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *string, cluster *capi.Cluster) error {
+func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *string, awsCluster *capa.AWSCluster) error {
 	logger := r.getLogger(ctx)
-
-	awsCluster, err := r.getAWSCluster(ctx, cluster)
-	if err != nil {
-		logger.Error(err, "Failed to get AWSCluster for Cluster")
-		return err
-	}
 
 	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
 
@@ -358,23 +381,80 @@ func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *st
 	return nil
 }
 
-func (r *TransitGateway) getAWSCluster(ctx context.Context, cluster *capi.Cluster) (*capa.AWSCluster, error) {
-	clusterNamespaceName := k8stypes.NamespacedName{
-		Name:      cluster.Spec.InfrastructureRef.Name,
-		Namespace: cluster.Spec.InfrastructureRef.Namespace,
+func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context, mc *capi.Cluster) (string, error) {
+	prefixListName := fmt.Sprintf("%s-%s-tgw-prefixlist", mc.ObjectMeta.Name, mc.ObjectMeta.Namespace)
+
+	result, err := r.transitGatewayClient.DescribeManagedPrefixLists(ctx, &ec2.DescribeManagedPrefixListsInput{
+		Filters: []types.Filter{
+			{
+				Name:   aws.String("prefix-list-name"),
+				Values: []string{prefixListName},
+			},
+		},
+	})
+	if err != nil {
+		return "", err
 	}
-	return r.clusterClient.GetAWSCluster(ctx, clusterNamespaceName)
+
+	if len(result.PrefixLists) > 1 {
+		return "", fmt.Errorf("unexpected number of prefix lists returned")
+	} else if len(result.PrefixLists) == 1 {
+		return *result.PrefixLists[0].PrefixListId, nil
+	}
+
+	output, err := r.transitGatewayClient.CreateManagedPrefixList(ctx, &ec2.CreateManagedPrefixListInput{
+		AddressFamily:  aws.String("IPv4"),
+		MaxEntries:     aws.Int32(200),
+		PrefixListName: &prefixListName,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return *output.PrefixList.PrefixListId, nil
 }
 
-func (r *TransitGateway) addRoute(ctx context.Context, transitGatewayID, cidr *string) error {
+func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster) error {
 	logger := r.getLogger(ctx)
-	mc, err := r.clusterClient.GetManagementCluster(ctx)
+
+	subnets := []string{}
+	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
+		subnets = append(subnets, s.ID)
+	}
+
+	output, err := r.transitGatewayClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+		Filters: []types.Filter{
+			{Name: aws.String("association.subnet-id"), Values: subnets},
+		},
+	})
 	if err != nil {
-		logger.Error(err, "Failed to get management cluster")
+		logger.Error(err, "Failed to get route tables")
 		return err
 	}
-	awsCluster, err := r.getAWSCluster(ctx, mc)
+
+	if output != nil && len(output.RouteTables) > 0 {
+		for _, rt := range output.RouteTables {
+			_, err = r.transitGatewayClient.CreateRoute(ctx, &ec2.CreateRouteInput{
+				RouteTableId:            rt.RouteTableId,
+				DestinationPrefixListId: prefixListID,
+				TransitGatewayId:        transitGatewayID,
+			})
+			if err != nil {
+				logger.Error(err, "Failed to add route to route table")
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSCluster) error {
+	logger := r.getLogger(ctx)
+
+	prefixListID, err := r.addToPrefixList(ctx, awsCluster)
 	if err != nil {
+		logger.Error(err, "Failed to add CIDR to prefix list")
 		return err
 	}
 
@@ -395,10 +475,9 @@ func (r *TransitGateway) addRoute(ctx context.Context, transitGatewayID, cidr *s
 
 	if output != nil && len(output.RouteTables) > 0 {
 		for _, rt := range output.RouteTables {
-			_, err = r.transitGatewayClient.CreateRoute(ctx, &ec2.CreateRouteInput{
-				RouteTableId:         rt.RouteTableId,
-				DestinationCidrBlock: cidr,
-				TransitGatewayId:     transitGatewayID,
+			_, err = r.transitGatewayClient.DeleteRoute(ctx, &ec2.DeleteRouteInput{
+				RouteTableId:            rt.RouteTableId,
+				DestinationPrefixListId: &prefixListID,
 			})
 			if err != nil {
 				logger.Error(err, "Failed to add route to route table")
@@ -408,6 +487,53 @@ func (r *TransitGateway) addRoute(ctx context.Context, transitGatewayID, cidr *s
 	}
 
 	return nil
+}
+
+func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.AWSCluster) (string, error) {
+	prefixListID := ""
+
+	mc, err := r.clusterClient.GetManagementCluster(ctx)
+	if err != nil {
+		return prefixListID, err
+	}
+
+	prefixListID, err = r.getOrCreatePrefixList(ctx, mc)
+	if err != nil {
+		return prefixListID, err
+	}
+
+	_, err = r.transitGatewayClient.ModifyManagedPrefixList(ctx, &ec2.ModifyManagedPrefixListInput{
+		PrefixListId: &prefixListID,
+		AddEntries: []types.AddPrefixListEntry{
+			{
+				Cidr:        &awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
+				Description: aws.String(fmt.Sprintf("CIDR block for cluster %s", awsCluster.ObjectMeta.Name)),
+			},
+		},
+	})
+
+	return prefixListID, err
+}
+
+func (r *TransitGateway) removeFromPrefixList(ctx context.Context, awsCluster *capa.AWSCluster) error {
+	mc, err := r.clusterClient.GetManagementCluster(ctx)
+	if err != nil {
+		return err
+	}
+
+	prefixListID, err := r.getOrCreatePrefixList(ctx, mc)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.transitGatewayClient.ModifyManagedPrefixList(ctx, &ec2.ModifyManagedPrefixListInput{
+		PrefixListId: &prefixListID,
+		RemoveEntries: []types.RemovePrefixListEntry{
+			{Cidr: &awsCluster.Spec.NetworkSpec.VPC.CidrBlock},
+		},
+	})
+
+	return err
 }
 
 func getPrivateSubnetsByAZ(subnets capa.Subnets) map[string]capa.Subnets {

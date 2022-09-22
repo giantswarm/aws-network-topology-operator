@@ -12,4 +12,8 @@ const (
 	// NetworkTopologyTransitGatewayIDAnnotation contains the ID of the Transit Gateway used by the cluster.
 	// This is either the user-provided TGW or the one created by this operator.
 	NetworkTopologyTransitGatewayIDAnnotation = "network-topology.giantswarm.io/transit-gateway"
+
+	// NetworkTopologyPrefixListIDAnnotation contains the ID of the Prefix List containing the CIDRs of all clusters.
+	// This is either the user-provided PL ID or the one created by this operator.
+	NetworkTopologyPrefixListIDAnnotation = "network-topology.giantswarm.io/prefix-list"
 )

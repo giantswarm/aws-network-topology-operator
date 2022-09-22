@@ -27,6 +27,11 @@ type TransitGatewayClient interface {
 
 	CreateRoute(ctx context.Context, params *ec2.CreateRouteInput, optFns ...func(*ec2.Options)) (*ec2.CreateRouteOutput, error)
 	DescribeRouteTables(ctx context.Context, params *ec2.DescribeRouteTablesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error)
+	DeleteRoute(ctx context.Context, params *ec2.DeleteRouteInput, optFns ...func(*ec2.Options)) (*ec2.DeleteRouteOutput, error)
+
+	CreateManagedPrefixList(ctx context.Context, params *ec2.CreateManagedPrefixListInput, optFns ...func(*ec2.Options)) (*ec2.CreateManagedPrefixListOutput, error)
+	DescribeManagedPrefixLists(ctx context.Context, params *ec2.DescribeManagedPrefixListsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeManagedPrefixListsOutput, error)
+	ModifyManagedPrefixList(ctx context.Context, params *ec2.ModifyManagedPrefixListInput, optFns ...func(*ec2.Options)) (*ec2.ModifyManagedPrefixListOutput, error)
 }
 
 type EC2Client struct {
@@ -108,4 +113,20 @@ func (e *EC2Client) CreateRoute(ctx context.Context, params *ec2.CreateRouteInpu
 
 func (e *EC2Client) DescribeRouteTables(ctx context.Context, params *ec2.DescribeRouteTablesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error) {
 	return e.client().DescribeRouteTables(ctx, params, optFns...)
+}
+
+func (e *EC2Client) DeleteRoute(ctx context.Context, params *ec2.DeleteRouteInput, optFns ...func(*ec2.Options)) (*ec2.DeleteRouteOutput, error) {
+	return e.client().DeleteRoute(ctx, params, optFns...)
+}
+
+func (e *EC2Client) CreateManagedPrefixList(ctx context.Context, params *ec2.CreateManagedPrefixListInput, optFns ...func(*ec2.Options)) (*ec2.CreateManagedPrefixListOutput, error) {
+	return e.client().CreateManagedPrefixList(ctx, params, optFns...)
+}
+
+func (e *EC2Client) DescribeManagedPrefixLists(ctx context.Context, params *ec2.DescribeManagedPrefixListsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeManagedPrefixListsOutput, error) {
+	return e.client().DescribeManagedPrefixLists(ctx, params, optFns...)
+}
+
+func (e *EC2Client) ModifyManagedPrefixList(ctx context.Context, params *ec2.ModifyManagedPrefixListInput, optFns ...func(*ec2.Options)) (*ec2.ModifyManagedPrefixListOutput, error) {
+	return e.client().ModifyManagedPrefixList(ctx, params, optFns...)
 }
