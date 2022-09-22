@@ -503,6 +503,22 @@ func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.A
 	}
 	prefixListID = *prefixList.PrefixListId
 
+	result, err := r.transitGatewayClient.GetManagedPrefixListEntries(ctx, &ec2.GetManagedPrefixListEntriesInput{
+		PrefixListId:  &prefixListID,
+		MaxResults:    aws.Int32(200),
+		TargetVersion: prefixList.Version,
+	})
+	if err != nil {
+		return prefixListID, err
+	}
+
+	for _, entry := range result.Entries {
+		if *entry.Cidr == awsCluster.Spec.NetworkSpec.VPC.CidrBlock {
+			// entry already exists
+			return prefixListID, err
+		}
+	}
+
 	_, err = r.transitGatewayClient.ModifyManagedPrefixList(ctx, &ec2.ModifyManagedPrefixListInput{
 		PrefixListId:   &prefixListID,
 		CurrentVersion: prefixList.Version,

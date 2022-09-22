@@ -485,6 +485,13 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -593,6 +600,13 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -690,6 +704,13 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -782,6 +803,13 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 							PrefixLists: []awstypes.ManagedPrefixList{
 								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
 							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
 						},
 						nil,
 					)
@@ -889,6 +917,13 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -987,6 +1022,13 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 							PrefixLists: []awstypes.ManagedPrefixList{
 								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
 							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
 						},
 						nil,
 					)
