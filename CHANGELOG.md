@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Create Prefix List for use with the TGW routing
+- Added `network-topology.giantswarm.io/prefix-list` annotation support
+
+### Fixed
+
+- Add TGW route to cluster subnet route tables
+
 ## [0.1.7] - 2022-09-20
 
 ### Fixed

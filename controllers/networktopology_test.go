@@ -43,6 +43,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		transitGatewayClient *awsfakes.FakeTransitGatewayClient
 
 		transitGatewayID = "abc-123"
+		prefixListID     = "prefix-123"
 		mcVPCId          = "vpc-123"
 		wcVPCId          = "vpc-987"
 
@@ -469,6 +470,20 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{},
+						nil,
+					)
+
+					transitGatewayClient.CreateManagedPrefixListReturns(
+						&ec2.CreateManagedPrefixListOutput{
+							PrefixList: &awstypes.ManagedPrefixList{
+								PrefixListId: &prefixListID,
+							},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -509,7 +524,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-						ResourceType: awstypes.ResourceTypeTransitGateway,
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
@@ -518,6 +533,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						},
 					}))
 					Expect(*payload.VpcId).To(Equal(mcVPCId))
+				})
+
+				It("should not create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
 				})
 			})
 
@@ -564,6 +583,15 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID},
+							},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -593,7 +621,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-						ResourceType: awstypes.ResourceTypeTransitGateway,
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
@@ -602,6 +630,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						},
 					}))
 					Expect(*payload.VpcId).To(Equal(mcVPCId))
+				})
+
+				It("should not create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
 				})
 			})
 
@@ -648,6 +680,15 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Errorf("Conflict"),
 					)
 
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID},
+							},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -674,6 +715,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 				It("should not create a transit gateway attachment", func() {
 					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				})
+
+				It("should not create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
 				})
 			})
 
@@ -731,6 +776,15 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID},
+							},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -760,7 +814,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-						ResourceType: awstypes.ResourceTypeTransitGateway,
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
@@ -825,6 +879,15 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID},
+							},
+						},
+						nil,
+					)
+
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 						Name:      mcCluster.ObjectMeta.Name,
 						Namespace: mcCluster.ObjectMeta.Namespace,
@@ -854,7 +917,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-						ResourceType: awstypes.ResourceTypeTransitGateway,
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
@@ -916,6 +979,15 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
 						nil,
 						fmt.Errorf("Conflict"),
+					)
+
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID},
+							},
+						},
+						nil,
 					)
 
 					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{

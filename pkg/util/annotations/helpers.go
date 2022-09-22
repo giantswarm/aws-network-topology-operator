@@ -30,6 +30,12 @@ func SetNetworkTopologyTransitGatewayID(o metav1.Object, transitGatewayID string
 	})
 }
 
+func SetNetworkTopologyPrefixListID(o metav1.Object, prefixListID string) {
+	AddAnnotations(o, map[string]string{
+		NetworkTopologyPrefixListIDAnnotation: prefixListID,
+	})
+}
+
 // GetAnnotation returns the value of the specified annotation.
 func GetAnnotation(o metav1.Object, annotation string) string {
 	annotations := o.GetAnnotations()

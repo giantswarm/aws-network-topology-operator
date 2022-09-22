@@ -11,6 +11,36 @@ import (
 )
 
 type FakeTransitGatewayClient struct {
+	CreateManagedPrefixListStub        func(context.Context, *ec2.CreateManagedPrefixListInput, ...func(*ec2.Options)) (*ec2.CreateManagedPrefixListOutput, error)
+	createManagedPrefixListMutex       sync.RWMutex
+	createManagedPrefixListArgsForCall []struct {
+		arg1 context.Context
+		arg2 *ec2.CreateManagedPrefixListInput
+		arg3 []func(*ec2.Options)
+	}
+	createManagedPrefixListReturns struct {
+		result1 *ec2.CreateManagedPrefixListOutput
+		result2 error
+	}
+	createManagedPrefixListReturnsOnCall map[int]struct {
+		result1 *ec2.CreateManagedPrefixListOutput
+		result2 error
+	}
+	CreateRouteStub        func(context.Context, *ec2.CreateRouteInput, ...func(*ec2.Options)) (*ec2.CreateRouteOutput, error)
+	createRouteMutex       sync.RWMutex
+	createRouteArgsForCall []struct {
+		arg1 context.Context
+		arg2 *ec2.CreateRouteInput
+		arg3 []func(*ec2.Options)
+	}
+	createRouteReturns struct {
+		result1 *ec2.CreateRouteOutput
+		result2 error
+	}
+	createRouteReturnsOnCall map[int]struct {
+		result1 *ec2.CreateRouteOutput
+		result2 error
+	}
 	CreateTransitGatewayStub        func(context.Context, *ec2.CreateTransitGatewayInput, ...func(*ec2.Options)) (*ec2.CreateTransitGatewayOutput, error)
 	createTransitGatewayMutex       sync.RWMutex
 	createTransitGatewayArgsForCall []struct {
@@ -39,6 +69,21 @@ type FakeTransitGatewayClient struct {
 	}
 	createTransitGatewayVpcAttachmentReturnsOnCall map[int]struct {
 		result1 *ec2.CreateTransitGatewayVpcAttachmentOutput
+		result2 error
+	}
+	DeleteRouteStub        func(context.Context, *ec2.DeleteRouteInput, ...func(*ec2.Options)) (*ec2.DeleteRouteOutput, error)
+	deleteRouteMutex       sync.RWMutex
+	deleteRouteArgsForCall []struct {
+		arg1 context.Context
+		arg2 *ec2.DeleteRouteInput
+		arg3 []func(*ec2.Options)
+	}
+	deleteRouteReturns struct {
+		result1 *ec2.DeleteRouteOutput
+		result2 error
+	}
+	deleteRouteReturnsOnCall map[int]struct {
+		result1 *ec2.DeleteRouteOutput
 		result2 error
 	}
 	DeleteTransitGatewayStub        func(context.Context, *ec2.DeleteTransitGatewayInput, ...func(*ec2.Options)) (*ec2.DeleteTransitGatewayOutput, error)
@@ -71,6 +116,36 @@ type FakeTransitGatewayClient struct {
 		result1 *ec2.DeleteTransitGatewayVpcAttachmentOutput
 		result2 error
 	}
+	DescribeManagedPrefixListsStub        func(context.Context, *ec2.DescribeManagedPrefixListsInput, ...func(*ec2.Options)) (*ec2.DescribeManagedPrefixListsOutput, error)
+	describeManagedPrefixListsMutex       sync.RWMutex
+	describeManagedPrefixListsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *ec2.DescribeManagedPrefixListsInput
+		arg3 []func(*ec2.Options)
+	}
+	describeManagedPrefixListsReturns struct {
+		result1 *ec2.DescribeManagedPrefixListsOutput
+		result2 error
+	}
+	describeManagedPrefixListsReturnsOnCall map[int]struct {
+		result1 *ec2.DescribeManagedPrefixListsOutput
+		result2 error
+	}
+	DescribeRouteTablesStub        func(context.Context, *ec2.DescribeRouteTablesInput, ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error)
+	describeRouteTablesMutex       sync.RWMutex
+	describeRouteTablesArgsForCall []struct {
+		arg1 context.Context
+		arg2 *ec2.DescribeRouteTablesInput
+		arg3 []func(*ec2.Options)
+	}
+	describeRouteTablesReturns struct {
+		result1 *ec2.DescribeRouteTablesOutput
+		result2 error
+	}
+	describeRouteTablesReturnsOnCall map[int]struct {
+		result1 *ec2.DescribeRouteTablesOutput
+		result2 error
+	}
 	DescribeTransitGatewayVpcAttachmentsStub        func(context.Context, *ec2.DescribeTransitGatewayVpcAttachmentsInput, ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error)
 	describeTransitGatewayVpcAttachmentsMutex       sync.RWMutex
 	describeTransitGatewayVpcAttachmentsArgsForCall []struct {
@@ -101,8 +176,155 @@ type FakeTransitGatewayClient struct {
 		result1 *ec2.DescribeTransitGatewaysOutput
 		result2 error
 	}
+	ModifyManagedPrefixListStub        func(context.Context, *ec2.ModifyManagedPrefixListInput, ...func(*ec2.Options)) (*ec2.ModifyManagedPrefixListOutput, error)
+	modifyManagedPrefixListMutex       sync.RWMutex
+	modifyManagedPrefixListArgsForCall []struct {
+		arg1 context.Context
+		arg2 *ec2.ModifyManagedPrefixListInput
+		arg3 []func(*ec2.Options)
+	}
+	modifyManagedPrefixListReturns struct {
+		result1 *ec2.ModifyManagedPrefixListOutput
+		result2 error
+	}
+	modifyManagedPrefixListReturnsOnCall map[int]struct {
+		result1 *ec2.ModifyManagedPrefixListOutput
+		result2 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeTransitGatewayClient) CreateManagedPrefixList(arg1 context.Context, arg2 *ec2.CreateManagedPrefixListInput, arg3 ...func(*ec2.Options)) (*ec2.CreateManagedPrefixListOutput, error) {
+	fake.createManagedPrefixListMutex.Lock()
+	ret, specificReturn := fake.createManagedPrefixListReturnsOnCall[len(fake.createManagedPrefixListArgsForCall)]
+	fake.createManagedPrefixListArgsForCall = append(fake.createManagedPrefixListArgsForCall, struct {
+		arg1 context.Context
+		arg2 *ec2.CreateManagedPrefixListInput
+		arg3 []func(*ec2.Options)
+	}{arg1, arg2, arg3})
+	stub := fake.CreateManagedPrefixListStub
+	fakeReturns := fake.createManagedPrefixListReturns
+	fake.recordInvocation("CreateManagedPrefixList", []interface{}{arg1, arg2, arg3})
+	fake.createManagedPrefixListMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeTransitGatewayClient) CreateManagedPrefixListCallCount() int {
+	fake.createManagedPrefixListMutex.RLock()
+	defer fake.createManagedPrefixListMutex.RUnlock()
+	return len(fake.createManagedPrefixListArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) CreateManagedPrefixListCalls(stub func(context.Context, *ec2.CreateManagedPrefixListInput, ...func(*ec2.Options)) (*ec2.CreateManagedPrefixListOutput, error)) {
+	fake.createManagedPrefixListMutex.Lock()
+	defer fake.createManagedPrefixListMutex.Unlock()
+	fake.CreateManagedPrefixListStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) CreateManagedPrefixListArgsForCall(i int) (context.Context, *ec2.CreateManagedPrefixListInput, []func(*ec2.Options)) {
+	fake.createManagedPrefixListMutex.RLock()
+	defer fake.createManagedPrefixListMutex.RUnlock()
+	argsForCall := fake.createManagedPrefixListArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeTransitGatewayClient) CreateManagedPrefixListReturns(result1 *ec2.CreateManagedPrefixListOutput, result2 error) {
+	fake.createManagedPrefixListMutex.Lock()
+	defer fake.createManagedPrefixListMutex.Unlock()
+	fake.CreateManagedPrefixListStub = nil
+	fake.createManagedPrefixListReturns = struct {
+		result1 *ec2.CreateManagedPrefixListOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) CreateManagedPrefixListReturnsOnCall(i int, result1 *ec2.CreateManagedPrefixListOutput, result2 error) {
+	fake.createManagedPrefixListMutex.Lock()
+	defer fake.createManagedPrefixListMutex.Unlock()
+	fake.CreateManagedPrefixListStub = nil
+	if fake.createManagedPrefixListReturnsOnCall == nil {
+		fake.createManagedPrefixListReturnsOnCall = make(map[int]struct {
+			result1 *ec2.CreateManagedPrefixListOutput
+			result2 error
+		})
+	}
+	fake.createManagedPrefixListReturnsOnCall[i] = struct {
+		result1 *ec2.CreateManagedPrefixListOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) CreateRoute(arg1 context.Context, arg2 *ec2.CreateRouteInput, arg3 ...func(*ec2.Options)) (*ec2.CreateRouteOutput, error) {
+	fake.createRouteMutex.Lock()
+	ret, specificReturn := fake.createRouteReturnsOnCall[len(fake.createRouteArgsForCall)]
+	fake.createRouteArgsForCall = append(fake.createRouteArgsForCall, struct {
+		arg1 context.Context
+		arg2 *ec2.CreateRouteInput
+		arg3 []func(*ec2.Options)
+	}{arg1, arg2, arg3})
+	stub := fake.CreateRouteStub
+	fakeReturns := fake.createRouteReturns
+	fake.recordInvocation("CreateRoute", []interface{}{arg1, arg2, arg3})
+	fake.createRouteMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeTransitGatewayClient) CreateRouteCallCount() int {
+	fake.createRouteMutex.RLock()
+	defer fake.createRouteMutex.RUnlock()
+	return len(fake.createRouteArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) CreateRouteCalls(stub func(context.Context, *ec2.CreateRouteInput, ...func(*ec2.Options)) (*ec2.CreateRouteOutput, error)) {
+	fake.createRouteMutex.Lock()
+	defer fake.createRouteMutex.Unlock()
+	fake.CreateRouteStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) CreateRouteArgsForCall(i int) (context.Context, *ec2.CreateRouteInput, []func(*ec2.Options)) {
+	fake.createRouteMutex.RLock()
+	defer fake.createRouteMutex.RUnlock()
+	argsForCall := fake.createRouteArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeTransitGatewayClient) CreateRouteReturns(result1 *ec2.CreateRouteOutput, result2 error) {
+	fake.createRouteMutex.Lock()
+	defer fake.createRouteMutex.Unlock()
+	fake.CreateRouteStub = nil
+	fake.createRouteReturns = struct {
+		result1 *ec2.CreateRouteOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) CreateRouteReturnsOnCall(i int, result1 *ec2.CreateRouteOutput, result2 error) {
+	fake.createRouteMutex.Lock()
+	defer fake.createRouteMutex.Unlock()
+	fake.CreateRouteStub = nil
+	if fake.createRouteReturnsOnCall == nil {
+		fake.createRouteReturnsOnCall = make(map[int]struct {
+			result1 *ec2.CreateRouteOutput
+			result2 error
+		})
+	}
+	fake.createRouteReturnsOnCall[i] = struct {
+		result1 *ec2.CreateRouteOutput
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeTransitGatewayClient) CreateTransitGateway(arg1 context.Context, arg2 *ec2.CreateTransitGatewayInput, arg3 ...func(*ec2.Options)) (*ec2.CreateTransitGatewayOutput, error) {
@@ -233,6 +455,72 @@ func (fake *FakeTransitGatewayClient) CreateTransitGatewayVpcAttachmentReturnsOn
 	}
 	fake.createTransitGatewayVpcAttachmentReturnsOnCall[i] = struct {
 		result1 *ec2.CreateTransitGatewayVpcAttachmentOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) DeleteRoute(arg1 context.Context, arg2 *ec2.DeleteRouteInput, arg3 ...func(*ec2.Options)) (*ec2.DeleteRouteOutput, error) {
+	fake.deleteRouteMutex.Lock()
+	ret, specificReturn := fake.deleteRouteReturnsOnCall[len(fake.deleteRouteArgsForCall)]
+	fake.deleteRouteArgsForCall = append(fake.deleteRouteArgsForCall, struct {
+		arg1 context.Context
+		arg2 *ec2.DeleteRouteInput
+		arg3 []func(*ec2.Options)
+	}{arg1, arg2, arg3})
+	stub := fake.DeleteRouteStub
+	fakeReturns := fake.deleteRouteReturns
+	fake.recordInvocation("DeleteRoute", []interface{}{arg1, arg2, arg3})
+	fake.deleteRouteMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeTransitGatewayClient) DeleteRouteCallCount() int {
+	fake.deleteRouteMutex.RLock()
+	defer fake.deleteRouteMutex.RUnlock()
+	return len(fake.deleteRouteArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) DeleteRouteCalls(stub func(context.Context, *ec2.DeleteRouteInput, ...func(*ec2.Options)) (*ec2.DeleteRouteOutput, error)) {
+	fake.deleteRouteMutex.Lock()
+	defer fake.deleteRouteMutex.Unlock()
+	fake.DeleteRouteStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) DeleteRouteArgsForCall(i int) (context.Context, *ec2.DeleteRouteInput, []func(*ec2.Options)) {
+	fake.deleteRouteMutex.RLock()
+	defer fake.deleteRouteMutex.RUnlock()
+	argsForCall := fake.deleteRouteArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeTransitGatewayClient) DeleteRouteReturns(result1 *ec2.DeleteRouteOutput, result2 error) {
+	fake.deleteRouteMutex.Lock()
+	defer fake.deleteRouteMutex.Unlock()
+	fake.DeleteRouteStub = nil
+	fake.deleteRouteReturns = struct {
+		result1 *ec2.DeleteRouteOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) DeleteRouteReturnsOnCall(i int, result1 *ec2.DeleteRouteOutput, result2 error) {
+	fake.deleteRouteMutex.Lock()
+	defer fake.deleteRouteMutex.Unlock()
+	fake.DeleteRouteStub = nil
+	if fake.deleteRouteReturnsOnCall == nil {
+		fake.deleteRouteReturnsOnCall = make(map[int]struct {
+			result1 *ec2.DeleteRouteOutput
+			result2 error
+		})
+	}
+	fake.deleteRouteReturnsOnCall[i] = struct {
+		result1 *ec2.DeleteRouteOutput
 		result2 error
 	}{result1, result2}
 }
@@ -369,6 +657,138 @@ func (fake *FakeTransitGatewayClient) DeleteTransitGatewayVpcAttachmentReturnsOn
 	}{result1, result2}
 }
 
+func (fake *FakeTransitGatewayClient) DescribeManagedPrefixLists(arg1 context.Context, arg2 *ec2.DescribeManagedPrefixListsInput, arg3 ...func(*ec2.Options)) (*ec2.DescribeManagedPrefixListsOutput, error) {
+	fake.describeManagedPrefixListsMutex.Lock()
+	ret, specificReturn := fake.describeManagedPrefixListsReturnsOnCall[len(fake.describeManagedPrefixListsArgsForCall)]
+	fake.describeManagedPrefixListsArgsForCall = append(fake.describeManagedPrefixListsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *ec2.DescribeManagedPrefixListsInput
+		arg3 []func(*ec2.Options)
+	}{arg1, arg2, arg3})
+	stub := fake.DescribeManagedPrefixListsStub
+	fakeReturns := fake.describeManagedPrefixListsReturns
+	fake.recordInvocation("DescribeManagedPrefixLists", []interface{}{arg1, arg2, arg3})
+	fake.describeManagedPrefixListsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeTransitGatewayClient) DescribeManagedPrefixListsCallCount() int {
+	fake.describeManagedPrefixListsMutex.RLock()
+	defer fake.describeManagedPrefixListsMutex.RUnlock()
+	return len(fake.describeManagedPrefixListsArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) DescribeManagedPrefixListsCalls(stub func(context.Context, *ec2.DescribeManagedPrefixListsInput, ...func(*ec2.Options)) (*ec2.DescribeManagedPrefixListsOutput, error)) {
+	fake.describeManagedPrefixListsMutex.Lock()
+	defer fake.describeManagedPrefixListsMutex.Unlock()
+	fake.DescribeManagedPrefixListsStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) DescribeManagedPrefixListsArgsForCall(i int) (context.Context, *ec2.DescribeManagedPrefixListsInput, []func(*ec2.Options)) {
+	fake.describeManagedPrefixListsMutex.RLock()
+	defer fake.describeManagedPrefixListsMutex.RUnlock()
+	argsForCall := fake.describeManagedPrefixListsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeTransitGatewayClient) DescribeManagedPrefixListsReturns(result1 *ec2.DescribeManagedPrefixListsOutput, result2 error) {
+	fake.describeManagedPrefixListsMutex.Lock()
+	defer fake.describeManagedPrefixListsMutex.Unlock()
+	fake.DescribeManagedPrefixListsStub = nil
+	fake.describeManagedPrefixListsReturns = struct {
+		result1 *ec2.DescribeManagedPrefixListsOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) DescribeManagedPrefixListsReturnsOnCall(i int, result1 *ec2.DescribeManagedPrefixListsOutput, result2 error) {
+	fake.describeManagedPrefixListsMutex.Lock()
+	defer fake.describeManagedPrefixListsMutex.Unlock()
+	fake.DescribeManagedPrefixListsStub = nil
+	if fake.describeManagedPrefixListsReturnsOnCall == nil {
+		fake.describeManagedPrefixListsReturnsOnCall = make(map[int]struct {
+			result1 *ec2.DescribeManagedPrefixListsOutput
+			result2 error
+		})
+	}
+	fake.describeManagedPrefixListsReturnsOnCall[i] = struct {
+		result1 *ec2.DescribeManagedPrefixListsOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) DescribeRouteTables(arg1 context.Context, arg2 *ec2.DescribeRouteTablesInput, arg3 ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error) {
+	fake.describeRouteTablesMutex.Lock()
+	ret, specificReturn := fake.describeRouteTablesReturnsOnCall[len(fake.describeRouteTablesArgsForCall)]
+	fake.describeRouteTablesArgsForCall = append(fake.describeRouteTablesArgsForCall, struct {
+		arg1 context.Context
+		arg2 *ec2.DescribeRouteTablesInput
+		arg3 []func(*ec2.Options)
+	}{arg1, arg2, arg3})
+	stub := fake.DescribeRouteTablesStub
+	fakeReturns := fake.describeRouteTablesReturns
+	fake.recordInvocation("DescribeRouteTables", []interface{}{arg1, arg2, arg3})
+	fake.describeRouteTablesMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeTransitGatewayClient) DescribeRouteTablesCallCount() int {
+	fake.describeRouteTablesMutex.RLock()
+	defer fake.describeRouteTablesMutex.RUnlock()
+	return len(fake.describeRouteTablesArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) DescribeRouteTablesCalls(stub func(context.Context, *ec2.DescribeRouteTablesInput, ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error)) {
+	fake.describeRouteTablesMutex.Lock()
+	defer fake.describeRouteTablesMutex.Unlock()
+	fake.DescribeRouteTablesStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) DescribeRouteTablesArgsForCall(i int) (context.Context, *ec2.DescribeRouteTablesInput, []func(*ec2.Options)) {
+	fake.describeRouteTablesMutex.RLock()
+	defer fake.describeRouteTablesMutex.RUnlock()
+	argsForCall := fake.describeRouteTablesArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeTransitGatewayClient) DescribeRouteTablesReturns(result1 *ec2.DescribeRouteTablesOutput, result2 error) {
+	fake.describeRouteTablesMutex.Lock()
+	defer fake.describeRouteTablesMutex.Unlock()
+	fake.DescribeRouteTablesStub = nil
+	fake.describeRouteTablesReturns = struct {
+		result1 *ec2.DescribeRouteTablesOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) DescribeRouteTablesReturnsOnCall(i int, result1 *ec2.DescribeRouteTablesOutput, result2 error) {
+	fake.describeRouteTablesMutex.Lock()
+	defer fake.describeRouteTablesMutex.Unlock()
+	fake.DescribeRouteTablesStub = nil
+	if fake.describeRouteTablesReturnsOnCall == nil {
+		fake.describeRouteTablesReturnsOnCall = make(map[int]struct {
+			result1 *ec2.DescribeRouteTablesOutput
+			result2 error
+		})
+	}
+	fake.describeRouteTablesReturnsOnCall[i] = struct {
+		result1 *ec2.DescribeRouteTablesOutput
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeTransitGatewayClient) DescribeTransitGatewayVpcAttachments(arg1 context.Context, arg2 *ec2.DescribeTransitGatewayVpcAttachmentsInput, arg3 ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
 	fake.describeTransitGatewayVpcAttachmentsMutex.Lock()
 	ret, specificReturn := fake.describeTransitGatewayVpcAttachmentsReturnsOnCall[len(fake.describeTransitGatewayVpcAttachmentsArgsForCall)]
@@ -501,21 +921,99 @@ func (fake *FakeTransitGatewayClient) DescribeTransitGatewaysReturnsOnCall(i int
 	}{result1, result2}
 }
 
+func (fake *FakeTransitGatewayClient) ModifyManagedPrefixList(arg1 context.Context, arg2 *ec2.ModifyManagedPrefixListInput, arg3 ...func(*ec2.Options)) (*ec2.ModifyManagedPrefixListOutput, error) {
+	fake.modifyManagedPrefixListMutex.Lock()
+	ret, specificReturn := fake.modifyManagedPrefixListReturnsOnCall[len(fake.modifyManagedPrefixListArgsForCall)]
+	fake.modifyManagedPrefixListArgsForCall = append(fake.modifyManagedPrefixListArgsForCall, struct {
+		arg1 context.Context
+		arg2 *ec2.ModifyManagedPrefixListInput
+		arg3 []func(*ec2.Options)
+	}{arg1, arg2, arg3})
+	stub := fake.ModifyManagedPrefixListStub
+	fakeReturns := fake.modifyManagedPrefixListReturns
+	fake.recordInvocation("ModifyManagedPrefixList", []interface{}{arg1, arg2, arg3})
+	fake.modifyManagedPrefixListMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeTransitGatewayClient) ModifyManagedPrefixListCallCount() int {
+	fake.modifyManagedPrefixListMutex.RLock()
+	defer fake.modifyManagedPrefixListMutex.RUnlock()
+	return len(fake.modifyManagedPrefixListArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) ModifyManagedPrefixListCalls(stub func(context.Context, *ec2.ModifyManagedPrefixListInput, ...func(*ec2.Options)) (*ec2.ModifyManagedPrefixListOutput, error)) {
+	fake.modifyManagedPrefixListMutex.Lock()
+	defer fake.modifyManagedPrefixListMutex.Unlock()
+	fake.ModifyManagedPrefixListStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) ModifyManagedPrefixListArgsForCall(i int) (context.Context, *ec2.ModifyManagedPrefixListInput, []func(*ec2.Options)) {
+	fake.modifyManagedPrefixListMutex.RLock()
+	defer fake.modifyManagedPrefixListMutex.RUnlock()
+	argsForCall := fake.modifyManagedPrefixListArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeTransitGatewayClient) ModifyManagedPrefixListReturns(result1 *ec2.ModifyManagedPrefixListOutput, result2 error) {
+	fake.modifyManagedPrefixListMutex.Lock()
+	defer fake.modifyManagedPrefixListMutex.Unlock()
+	fake.ModifyManagedPrefixListStub = nil
+	fake.modifyManagedPrefixListReturns = struct {
+		result1 *ec2.ModifyManagedPrefixListOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) ModifyManagedPrefixListReturnsOnCall(i int, result1 *ec2.ModifyManagedPrefixListOutput, result2 error) {
+	fake.modifyManagedPrefixListMutex.Lock()
+	defer fake.modifyManagedPrefixListMutex.Unlock()
+	fake.ModifyManagedPrefixListStub = nil
+	if fake.modifyManagedPrefixListReturnsOnCall == nil {
+		fake.modifyManagedPrefixListReturnsOnCall = make(map[int]struct {
+			result1 *ec2.ModifyManagedPrefixListOutput
+			result2 error
+		})
+	}
+	fake.modifyManagedPrefixListReturnsOnCall[i] = struct {
+		result1 *ec2.ModifyManagedPrefixListOutput
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeTransitGatewayClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.createManagedPrefixListMutex.RLock()
+	defer fake.createManagedPrefixListMutex.RUnlock()
+	fake.createRouteMutex.RLock()
+	defer fake.createRouteMutex.RUnlock()
 	fake.createTransitGatewayMutex.RLock()
 	defer fake.createTransitGatewayMutex.RUnlock()
 	fake.createTransitGatewayVpcAttachmentMutex.RLock()
 	defer fake.createTransitGatewayVpcAttachmentMutex.RUnlock()
+	fake.deleteRouteMutex.RLock()
+	defer fake.deleteRouteMutex.RUnlock()
 	fake.deleteTransitGatewayMutex.RLock()
 	defer fake.deleteTransitGatewayMutex.RUnlock()
 	fake.deleteTransitGatewayVpcAttachmentMutex.RLock()
 	defer fake.deleteTransitGatewayVpcAttachmentMutex.RUnlock()
+	fake.describeManagedPrefixListsMutex.RLock()
+	defer fake.describeManagedPrefixListsMutex.RUnlock()
+	fake.describeRouteTablesMutex.RLock()
+	defer fake.describeRouteTablesMutex.RUnlock()
 	fake.describeTransitGatewayVpcAttachmentsMutex.RLock()
 	defer fake.describeTransitGatewayVpcAttachmentsMutex.RUnlock()
 	fake.describeTransitGatewaysMutex.RLock()
 	defer fake.describeTransitGatewaysMutex.RUnlock()
+	fake.modifyManagedPrefixListMutex.RLock()
+	defer fake.modifyManagedPrefixListMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
