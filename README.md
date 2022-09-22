@@ -22,7 +22,8 @@
                 "ec2:DeleteTransitGatewayVpcAttachment",
                 "ec2:CreateManagedPrefixList",
                 "ec2:DescribeManagedPrefixLists",
-                "ec2:ModifyManagedPrefixList"
+                "ec2:ModifyManagedPrefixList",
+                "ec2:GetManagedPrefixListEntries"
             ],
             "Resource": "*"
         }
