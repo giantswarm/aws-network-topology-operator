@@ -479,6 +479,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.CreateManagedPrefixListOutput{
 							PrefixList: &awstypes.ManagedPrefixList{
 								PrefixListId: &prefixListID,
+								Version:      aws.Int64(1),
 							},
 						},
 						nil,
@@ -586,7 +587,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID},
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
 							},
 						},
 						nil,
@@ -683,7 +684,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID},
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
 							},
 						},
 						nil,
@@ -779,7 +780,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID},
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
 							},
 						},
 						nil,
@@ -882,7 +883,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID},
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
 							},
 						},
 						nil,
@@ -984,7 +985,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID},
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
 							},
 						},
 						nil,

@@ -381,7 +381,7 @@ func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *st
 	return nil
 }
 
-func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context, mc *capi.Cluster) (string, error) {
+func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context, mc *capi.Cluster) (*types.ManagedPrefixList, error) {
 	prefixListName := fmt.Sprintf("%s-%s-tgw-prefixlist", mc.ObjectMeta.Name, mc.ObjectMeta.Namespace)
 
 	result, err := r.transitGatewayClient.DescribeManagedPrefixLists(ctx, &ec2.DescribeManagedPrefixListsInput{
@@ -393,13 +393,13 @@ func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context, mc *capi.Clu
 		},
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if len(result.PrefixLists) > 1 {
-		return "", fmt.Errorf("unexpected number of prefix lists returned")
+		return nil, fmt.Errorf("unexpected number of prefix lists returned")
 	} else if len(result.PrefixLists) == 1 {
-		return *result.PrefixLists[0].PrefixListId, nil
+		return &result.PrefixLists[0], nil
 	}
 
 	output, err := r.transitGatewayClient.CreateManagedPrefixList(ctx, &ec2.CreateManagedPrefixListInput{
@@ -408,10 +408,10 @@ func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context, mc *capi.Clu
 		PrefixListName: &prefixListName,
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return *output.PrefixList.PrefixListId, nil
+	return output.PrefixList, nil
 }
 
 func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster) error {
@@ -497,13 +497,15 @@ func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.A
 		return prefixListID, err
 	}
 
-	prefixListID, err = r.getOrCreatePrefixList(ctx, mc)
+	prefixList, err := r.getOrCreatePrefixList(ctx, mc)
 	if err != nil {
 		return prefixListID, err
 	}
+	prefixListID = *prefixList.PrefixListId
 
 	_, err = r.transitGatewayClient.ModifyManagedPrefixList(ctx, &ec2.ModifyManagedPrefixListInput{
-		PrefixListId: &prefixListID,
+		PrefixListId:   &prefixListID,
+		CurrentVersion: prefixList.Version,
 		AddEntries: []types.AddPrefixListEntry{
 			{
 				Cidr:        &awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
@@ -521,13 +523,14 @@ func (r *TransitGateway) removeFromPrefixList(ctx context.Context, awsCluster *c
 		return err
 	}
 
-	prefixListID, err := r.getOrCreatePrefixList(ctx, mc)
+	prefixList, err := r.getOrCreatePrefixList(ctx, mc)
 	if err != nil {
 		return err
 	}
 
 	_, err = r.transitGatewayClient.ModifyManagedPrefixList(ctx, &ec2.ModifyManagedPrefixListInput{
-		PrefixListId: &prefixListID,
+		PrefixListId:   prefixList.PrefixListId,
+		CurrentVersion: prefixList.Version,
 		RemoveEntries: []types.RemovePrefixListEntry{
 			{Cidr: &awsCluster.Spec.NetworkSpec.VPC.CidrBlock},
 		},
