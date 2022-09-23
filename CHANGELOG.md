@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Check for CIDR before attempting to remove from prefix list
+- Added missing `/status` subresource permission to RBAC role
 
 ## [1.1.0] - 2022-09-23
 
