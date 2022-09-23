@@ -548,8 +548,16 @@ func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.A
 		return prefixListID, err
 	}
 
+	description := fmt.Sprintf("CIDR block for cluster %s", awsCluster.ObjectMeta.Name)
+
 	for _, entry := range result.Entries {
 		if *entry.Cidr == awsCluster.Spec.NetworkSpec.VPC.CidrBlock {
+			if *entry.Description != description {
+				err = fmt.Errorf("conflicting CIDR already exists on prefix list")
+				logger.Error(err, "The CIDR already exists on the prefix list and belongs to another cluster", "prefixListID", prefixListID, "version", prefixList.Version, "cidr", awsCluster.Spec.NetworkSpec.VPC.CidrBlock)
+				return prefixListID, err
+			}
+
 			// entry already exists
 			logger.Info("Entry already exists in prefix list, skipping")
 			return prefixListID, err
@@ -562,7 +570,7 @@ func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.A
 		AddEntries: []types.AddPrefixListEntry{
 			{
 				Cidr:        &awsCluster.Spec.NetworkSpec.VPC.CidrBlock,
-				Description: aws.String(fmt.Sprintf("CIDR block for cluster %s", awsCluster.ObjectMeta.Name)),
+				Description: &description,
 			},
 		},
 	})
