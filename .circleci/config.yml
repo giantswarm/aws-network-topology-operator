@@ -2,14 +2,29 @@ version: 2.1
 orbs:
   architect: giantswarm/architect@4.24.0
 
+jobs:
+  unit-tests:
+    executor: architect/architect
+    steps:
+      - checkout
+      - run:
+          name: "Run unit tests"
+          command: CGO_ENABLED=0 make test-unit
+
 workflows:
   test-and-push:
     jobs:
+      - unit-tests:
+          filters:
+            tags:
+              only: /^v.*/
       - architect/go-build:
           context: architect
           name: go-build
           binary: aws-network-topology-operator
           resource_class: xlarge
+          requires:
+            - unit-tests
           filters:
             tags:
               only: /^v.*/
