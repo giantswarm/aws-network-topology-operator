@@ -2,14 +2,19 @@ package k8sclient
 
 import (
 	"context"
+	"time"
 
 	"github.com/giantswarm/microerror"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
+
+var networkTopologyCondition capi.ConditionType = "NetworkTopologyReady"
 
 type Cluster struct {
 	Client            client.Client
@@ -118,4 +123,38 @@ func (g *Cluster) GetAWSClusterRoleIdentity(ctx context.Context, namespacedName 
 		return nil, microerror.Mask(err)
 	}
 	return identity, microerror.Mask(err)
+}
+
+func (g *Cluster) HasStatusCondition(ctx context.Context, cluster *capi.Cluster) bool {
+	for _, c := range cluster.Status.Conditions {
+		if c.Type == networkTopologyCondition {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Cluster) UpdateStatusCondition(ctx context.Context, cluster *capi.Cluster, status corev1.ConditionStatus) error {
+	originalCluster := cluster.DeepCopy()
+
+	found := false
+	condition := capi.Condition{
+		Type:               networkTopologyCondition,
+		Status:             status,
+		LastTransitionTime: metav1.Time{Time: time.Now()},
+	}
+
+	for _, c := range cluster.Status.Conditions {
+		if c.Type == networkTopologyCondition {
+			found = true
+			c.LastTransitionTime = condition.LastTransitionTime
+			c.Status = condition.Status
+		}
+	}
+
+	if !found {
+		cluster.Status.Conditions = append(cluster.Status.Conditions, condition)
+	}
+
+	return g.Client.Status().Patch(ctx, cluster, client.MergeFrom(originalCluster))
 }

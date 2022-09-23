@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/giantswarm/microerror"
+	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -23,6 +24,8 @@ type ClusterClient interface {
 	Get(context.Context, types.NamespacedName) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capi.Cluster, string) error
 	RemoveFinalizer(context.Context, *capi.Cluster, string) error
+	HasStatusCondition(ctx context.Context, cluster *capi.Cluster) bool
+	UpdateStatusCondition(ctx context.Context, cluster *capi.Cluster, status corev1.ConditionStatus) error
 }
 
 //counterfeiter:generate . Registrar
@@ -69,6 +72,11 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
+	if !r.client.HasStatusCondition(ctx, cluster) {
+		// We're ok to continue if this fails
+		_ = r.client.UpdateStatusCondition(ctx, cluster, corev1.ConditionFalse)
+	}
+
 	if !cluster.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, cluster)
 	}
@@ -96,6 +104,9 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, microerror.Mask(err)
 		}
 	}
+
+	// We're ok to continue if this fails
+	_ = r.client.UpdateStatusCondition(ctx, cluster, corev1.ConditionTrue)
 
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, nil
 }
