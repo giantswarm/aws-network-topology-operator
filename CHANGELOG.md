@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Reduced max entries for prefix list
+
+### Changed
+
+- Refactored logging for cleaner output and less noise
+
+### Added
+
+- Support getting prefix list based on ID in annotation
+
 ## [0.2.2] - 2022-09-22
 
 ### Fixed
