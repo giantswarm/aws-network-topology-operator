@@ -1,4 +1,4 @@
-module github.com/giantswarm/aws-network-topology-operator/v2
+module github.com/giantswarm/aws-network-topology-operator
 
 go 1.18
 

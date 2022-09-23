@@ -19,13 +19,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/giantswarm/aws-network-topology-operator/v2/controllers"
-	"github.com/giantswarm/aws-network-topology-operator/v2/controllers/controllersfakes"
-	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/aws/awsfakes"
-	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/k8sclient"
-	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/registrar"
-	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/util/annotations"
-	"github.com/giantswarm/aws-network-topology-operator/v2/tests"
+	"github.com/giantswarm/aws-network-topology-operator/controllers"
+	"github.com/giantswarm/aws-network-topology-operator/controllers/controllersfakes"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/aws/awsfakes"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
+	"github.com/giantswarm/aws-network-topology-operator/tests"
 )
 
 type ClusterClient interface {

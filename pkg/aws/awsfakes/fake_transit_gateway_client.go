@@ -7,7 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
-	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/aws"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 )
 
 type FakeTransitGatewayClient struct {

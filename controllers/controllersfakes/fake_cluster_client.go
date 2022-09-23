@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api/api/v1beta1"
 
-	"github.com/giantswarm/aws-network-topology-operator/v2/controllers"
+	"github.com/giantswarm/aws-network-topology-operator/controllers"
 )
 
 type FakeClusterClient struct {

@@ -14,8 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	awsclient "github.com/giantswarm/aws-network-topology-operator/v2/pkg/aws"
-	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/util/annotations"
+	awsclient "github.com/giantswarm/aws-network-topology-operator/pkg/aws"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 )
 
 type contextKey string

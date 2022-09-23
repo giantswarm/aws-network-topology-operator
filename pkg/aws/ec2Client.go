@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/k8sclient"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
 )
 
 //counterfeiter:generate . TransitGatewayClient
