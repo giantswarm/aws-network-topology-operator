@@ -5,6 +5,7 @@ import (
 	"context"
 	"sync"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/cluster-api/api/v1beta1"
 
@@ -39,6 +40,18 @@ type FakeClusterClient struct {
 		result1 *v1beta1.Cluster
 		result2 error
 	}
+	HasStatusConditionStub        func(context.Context, *v1beta1.Cluster) bool
+	hasStatusConditionMutex       sync.RWMutex
+	hasStatusConditionArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1.Cluster
+	}
+	hasStatusConditionReturns struct {
+		result1 bool
+	}
+	hasStatusConditionReturnsOnCall map[int]struct {
+		result1 bool
+	}
 	RemoveFinalizerStub        func(context.Context, *v1beta1.Cluster, string) error
 	removeFinalizerMutex       sync.RWMutex
 	removeFinalizerArgsForCall []struct {
@@ -50,6 +63,19 @@ type FakeClusterClient struct {
 		result1 error
 	}
 	removeFinalizerReturnsOnCall map[int]struct {
+		result1 error
+	}
+	UpdateStatusConditionStub        func(context.Context, *v1beta1.Cluster, v1.ConditionStatus) error
+	updateStatusConditionMutex       sync.RWMutex
+	updateStatusConditionArgsForCall []struct {
+		arg1 context.Context
+		arg2 *v1beta1.Cluster
+		arg3 v1.ConditionStatus
+	}
+	updateStatusConditionReturns struct {
+		result1 error
+	}
+	updateStatusConditionReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -184,6 +210,68 @@ func (fake *FakeClusterClient) GetReturnsOnCall(i int, result1 *v1beta1.Cluster,
 	}{result1, result2}
 }
 
+func (fake *FakeClusterClient) HasStatusCondition(arg1 context.Context, arg2 *v1beta1.Cluster) bool {
+	fake.hasStatusConditionMutex.Lock()
+	ret, specificReturn := fake.hasStatusConditionReturnsOnCall[len(fake.hasStatusConditionArgsForCall)]
+	fake.hasStatusConditionArgsForCall = append(fake.hasStatusConditionArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1.Cluster
+	}{arg1, arg2})
+	stub := fake.HasStatusConditionStub
+	fakeReturns := fake.hasStatusConditionReturns
+	fake.recordInvocation("HasStatusCondition", []interface{}{arg1, arg2})
+	fake.hasStatusConditionMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClusterClient) HasStatusConditionCallCount() int {
+	fake.hasStatusConditionMutex.RLock()
+	defer fake.hasStatusConditionMutex.RUnlock()
+	return len(fake.hasStatusConditionArgsForCall)
+}
+
+func (fake *FakeClusterClient) HasStatusConditionCalls(stub func(context.Context, *v1beta1.Cluster) bool) {
+	fake.hasStatusConditionMutex.Lock()
+	defer fake.hasStatusConditionMutex.Unlock()
+	fake.HasStatusConditionStub = stub
+}
+
+func (fake *FakeClusterClient) HasStatusConditionArgsForCall(i int) (context.Context, *v1beta1.Cluster) {
+	fake.hasStatusConditionMutex.RLock()
+	defer fake.hasStatusConditionMutex.RUnlock()
+	argsForCall := fake.hasStatusConditionArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeClusterClient) HasStatusConditionReturns(result1 bool) {
+	fake.hasStatusConditionMutex.Lock()
+	defer fake.hasStatusConditionMutex.Unlock()
+	fake.HasStatusConditionStub = nil
+	fake.hasStatusConditionReturns = struct {
+		result1 bool
+	}{result1}
+}
+
+func (fake *FakeClusterClient) HasStatusConditionReturnsOnCall(i int, result1 bool) {
+	fake.hasStatusConditionMutex.Lock()
+	defer fake.hasStatusConditionMutex.Unlock()
+	fake.HasStatusConditionStub = nil
+	if fake.hasStatusConditionReturnsOnCall == nil {
+		fake.hasStatusConditionReturnsOnCall = make(map[int]struct {
+			result1 bool
+		})
+	}
+	fake.hasStatusConditionReturnsOnCall[i] = struct {
+		result1 bool
+	}{result1}
+}
+
 func (fake *FakeClusterClient) RemoveFinalizer(arg1 context.Context, arg2 *v1beta1.Cluster, arg3 string) error {
 	fake.removeFinalizerMutex.Lock()
 	ret, specificReturn := fake.removeFinalizerReturnsOnCall[len(fake.removeFinalizerArgsForCall)]
@@ -247,6 +335,69 @@ func (fake *FakeClusterClient) RemoveFinalizerReturnsOnCall(i int, result1 error
 	}{result1}
 }
 
+func (fake *FakeClusterClient) UpdateStatusCondition(arg1 context.Context, arg2 *v1beta1.Cluster, arg3 v1.ConditionStatus) error {
+	fake.updateStatusConditionMutex.Lock()
+	ret, specificReturn := fake.updateStatusConditionReturnsOnCall[len(fake.updateStatusConditionArgsForCall)]
+	fake.updateStatusConditionArgsForCall = append(fake.updateStatusConditionArgsForCall, struct {
+		arg1 context.Context
+		arg2 *v1beta1.Cluster
+		arg3 v1.ConditionStatus
+	}{arg1, arg2, arg3})
+	stub := fake.UpdateStatusConditionStub
+	fakeReturns := fake.updateStatusConditionReturns
+	fake.recordInvocation("UpdateStatusCondition", []interface{}{arg1, arg2, arg3})
+	fake.updateStatusConditionMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClusterClient) UpdateStatusConditionCallCount() int {
+	fake.updateStatusConditionMutex.RLock()
+	defer fake.updateStatusConditionMutex.RUnlock()
+	return len(fake.updateStatusConditionArgsForCall)
+}
+
+func (fake *FakeClusterClient) UpdateStatusConditionCalls(stub func(context.Context, *v1beta1.Cluster, v1.ConditionStatus) error) {
+	fake.updateStatusConditionMutex.Lock()
+	defer fake.updateStatusConditionMutex.Unlock()
+	fake.UpdateStatusConditionStub = stub
+}
+
+func (fake *FakeClusterClient) UpdateStatusConditionArgsForCall(i int) (context.Context, *v1beta1.Cluster, v1.ConditionStatus) {
+	fake.updateStatusConditionMutex.RLock()
+	defer fake.updateStatusConditionMutex.RUnlock()
+	argsForCall := fake.updateStatusConditionArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeClusterClient) UpdateStatusConditionReturns(result1 error) {
+	fake.updateStatusConditionMutex.Lock()
+	defer fake.updateStatusConditionMutex.Unlock()
+	fake.UpdateStatusConditionStub = nil
+	fake.updateStatusConditionReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeClusterClient) UpdateStatusConditionReturnsOnCall(i int, result1 error) {
+	fake.updateStatusConditionMutex.Lock()
+	defer fake.updateStatusConditionMutex.Unlock()
+	fake.UpdateStatusConditionStub = nil
+	if fake.updateStatusConditionReturnsOnCall == nil {
+		fake.updateStatusConditionReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.updateStatusConditionReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *FakeClusterClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -254,8 +405,12 @@ func (fake *FakeClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.addFinalizerMutex.RUnlock()
 	fake.getMutex.RLock()
 	defer fake.getMutex.RUnlock()
+	fake.hasStatusConditionMutex.RLock()
+	defer fake.hasStatusConditionMutex.RUnlock()
 	fake.removeFinalizerMutex.RLock()
 	defer fake.removeFinalizerMutex.RUnlock()
+	fake.updateStatusConditionMutex.RLock()
+	defer fake.updateStatusConditionMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
