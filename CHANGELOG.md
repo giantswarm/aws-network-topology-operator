@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2022-09-23
+
 ### Fixed
 
 - Check for CIDR before attempting to remove from prefix list
@@ -163,7 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.0.0...v1.0.1
