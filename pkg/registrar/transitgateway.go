@@ -565,7 +565,7 @@ func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.A
 		return prefixListID, err
 	}
 
-	description := fmt.Sprintf("CIDR block for cluster %s", awsCluster.ObjectMeta.Name)
+	description := buildEntryDescription(awsCluster)
 
 	for _, entry := range result.Entries {
 		if *entry.Cidr == awsCluster.Spec.NetworkSpec.VPC.CidrBlock {
@@ -608,19 +608,35 @@ func (r *TransitGateway) removeFromPrefixList(ctx context.Context, awsCluster *c
 		return err
 	}
 
-	_, err = r.transitGatewayClient.ModifyManagedPrefixList(ctx, &ec2.ModifyManagedPrefixListInput{
-		PrefixListId:   prefixList.PrefixListId,
-		CurrentVersion: prefixList.Version,
-		RemoveEntries: []types.RemovePrefixListEntry{
-			{Cidr: &awsCluster.Spec.NetworkSpec.VPC.CidrBlock},
-		},
+	result, err := r.transitGatewayClient.GetManagedPrefixListEntries(ctx, &ec2.GetManagedPrefixListEntriesInput{
+		PrefixListId:  prefixList.PrefixListId,
+		MaxResults:    aws.Int32(100),
+		TargetVersion: prefixList.Version,
 	})
 	if err != nil {
-		logger.Error(err, "Failed to remove from prefix list", "prefixListID", prefixList.PrefixListId, "version", prefixList.Version, "cidr", awsCluster.Spec.NetworkSpec.VPC.CidrBlock)
+		logger.Error(err, "Failed to get prefix list entries", "prefixListID", prefixList.PrefixListId, "version", prefixList.Version)
 		return err
 	}
 
-	logger.Info("Removed CIDR from prefix list", "prefixListID", prefixList.PrefixListId, "version", prefixList.Version, "cidr", awsCluster.Spec.NetworkSpec.VPC.CidrBlock)
+	for _, entry := range result.Entries {
+		if *entry.Cidr == awsCluster.Spec.NetworkSpec.VPC.CidrBlock && *entry.Description == buildEntryDescription(awsCluster) {
+			_, err = r.transitGatewayClient.ModifyManagedPrefixList(ctx, &ec2.ModifyManagedPrefixListInput{
+				PrefixListId:   prefixList.PrefixListId,
+				CurrentVersion: prefixList.Version,
+				RemoveEntries: []types.RemovePrefixListEntry{
+					{Cidr: &awsCluster.Spec.NetworkSpec.VPC.CidrBlock},
+				},
+			})
+			if err != nil {
+				logger.Error(err, "Failed to remove from prefix list", "prefixListID", prefixList.PrefixListId, "version", prefixList.Version, "cidr", awsCluster.Spec.NetworkSpec.VPC.CidrBlock)
+				return err
+			}
+
+			logger.Info("Removed CIDR from prefix list", "prefixListID", prefixList.PrefixListId, "version", prefixList.Version, "cidr", awsCluster.Spec.NetworkSpec.VPC.CidrBlock)
+			return nil
+		}
+	}
+
 	return nil
 }
 
@@ -638,4 +654,8 @@ func getPrivateSubnetsByAZ(subnets capa.Subnets) map[string]capa.Subnets {
 	}
 
 	return subnetMap
+}
+
+func buildEntryDescription(awsCluster *capa.AWSCluster) string {
+	return fmt.Sprintf("CIDR block for cluster %s", awsCluster.ObjectMeta.Name)
 }

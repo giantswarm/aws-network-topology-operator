@@ -78,6 +78,7 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
+		logger.Info("Reconciling delete")
 		return r.reconcileDelete(ctx, cluster)
 	}
 
