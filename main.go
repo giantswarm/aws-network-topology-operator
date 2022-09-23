@@ -36,10 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/giantswarm/aws-network-topology-operator/controllers"
-	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
-	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
-	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
+	"github.com/giantswarm/aws-network-topology-operator/v2/controllers"
+	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/aws"
+	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/k8sclient"
+	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/registrar"
 	//+kubebuilder:scaffold:imports
 )
 

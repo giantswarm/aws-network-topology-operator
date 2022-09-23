@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2022-09-23
+
 ### Fixed
 
 - Reduced max entries for prefix list
@@ -134,7 +136,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.2.3...v1.0.0
 [0.2.3]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/giantswarm/aws-network-topology-operator/compare/v0.2.0...v0.2.1

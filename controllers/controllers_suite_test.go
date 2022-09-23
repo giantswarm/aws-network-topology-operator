@@ -18,7 +18,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/giantswarm/aws-network-topology-operator/tests"
+	"github.com/giantswarm/aws-network-topology-operator/v2/tests"
 )
 
 func TestControllers(t *testing.T) {

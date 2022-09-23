@@ -13,7 +13,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
+	"github.com/giantswarm/aws-network-topology-operator/v2/pkg/registrar"
 )
 
 const FinalizerNetTop = "network-topology.finalizers.giantswarm.io"
