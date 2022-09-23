@@ -44,6 +44,10 @@ func (g *Cluster) GetManagementCluster(ctx context.Context) (*capi.Cluster, erro
 	return cluster, microerror.Mask(err)
 }
 
+func (g *Cluster) GetManagementClusterNamespacedName() types.NamespacedName {
+	return g.managementCluster
+}
+
 // GetAWSCluster retrieves an AWSCluster based on the provided namespace/name
 func (g *Cluster) GetAWSCluster(ctx context.Context, namespacedName types.NamespacedName) (*capa.AWSCluster, error) {
 	cluster := &capa.AWSCluster{}
