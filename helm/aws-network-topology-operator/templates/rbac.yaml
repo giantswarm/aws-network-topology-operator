@@ -11,10 +11,12 @@ rules:
     resources:
       - awsclusters
       - clusters
+      - clusters/status
     verbs:
       - get
       - list
       - patch
+      - update
       - watch
   - apiGroups:
       - infrastructure.cluster.x-k8s.io
