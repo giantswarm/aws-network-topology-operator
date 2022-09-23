@@ -30,3 +30,15 @@ func (e *TransitGatewayNotAvailableError) Error() string {
 func (e *TransitGatewayNotAvailableError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
+
+type VPCNotReadyError struct {
+	error
+}
+
+func (e *VPCNotReadyError) Error() string {
+	return "transit gateway not available"
+}
+
+func (e *VPCNotReadyError) Is(target error) bool {
+	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}

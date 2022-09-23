@@ -70,6 +70,12 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					VPC: capa.VPCSpec{
 						ID: vpcID,
 					},
+					Subnets: capa.Subnets{
+						{
+							ID:       "sub-1",
+							IsPublic: false,
+						},
+					},
 				},
 			},
 		}
@@ -131,6 +137,12 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						VPC: capa.VPCSpec{
 							ID: wcVPCId,
 						},
+						Subnets: capa.Subnets{
+							{
+								ID:       "sub-1",
+								IsPublic: false,
+							},
+						},
 					},
 				},
 			}
@@ -171,6 +183,12 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					NetworkSpec: capa.NetworkSpec{
 						VPC: capa.VPCSpec{
 							ID: mcVPCId,
+						},
+						Subnets: capa.Subnets{
+							{
+								ID:       "sub-1",
+								IsPublic: false,
+							},
 						},
 					},
 				},

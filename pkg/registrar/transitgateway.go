@@ -133,7 +133,10 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return err
 		}
 
-		if tgw.State == types.TransitGatewayStateAvailable {
+		if awsCluster.Spec.NetworkSpec.VPC.ID == "" {
+			logger.Info("vpc not yet ready, skipping attachment for now", "transitGatewayID", tgw.TransitGatewayId)
+			return &VPCNotReadyError{}
+		} else if tgw.State == types.TransitGatewayStateAvailable {
 			if err := r.attachTransitGateway(ctx, tgw.TransitGatewayId, awsCluster); err != nil {
 				return err
 			}
@@ -300,6 +303,12 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	subnets := []string{}
 	for _, s := range getPrivateSubnetsByAZ(awsCluster.Spec.NetworkSpec.Subnets) {
 		subnets = append(subnets, s[0].ID)
+	}
+
+	if vpcID == "" || len(subnets) == 0 {
+		err := fmt.Errorf("cluster network not yet available on AWSCluster resource")
+		logger.Error(err, "AWSCluster does not yet have network details available")
+		return err
 	}
 
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
