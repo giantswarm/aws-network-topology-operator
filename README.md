@@ -2,6 +2,17 @@
 
 # aws-network-topology-operator
 
+Handles the setup / configuration of high-level AWS networking to allow cross-VPC communication between clusters
+
+## Setup
+
+```shell
+./manager
+    --leader-elect
+    --management-cluster-name my-mc
+    --management-cluster-namespace org-giantswarm
+```
+
 ## Required IAM permissions
 
 ```json
