@@ -150,7 +150,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 		// Ensure TGW ID is saved back to the current cluster
 		baseCluster = cluster.DeepCopy()
 		annotations.SetNetworkTopologyPrefixListID(cluster, prefixListID)
-		if cluster, err = r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
+		if _, err = r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
 			logger.Error(err, "Failed to patch cluster resource with prefix list ID", "prefixListID", prefixListID)
 			return err
 		}
