@@ -477,7 +477,7 @@ func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefix
 		for _, rt := range output.RouteTables {
 
 			for _, route := range rt.Routes {
-				if *route.DestinationPrefixListId == *prefixListID && *route.TransitGatewayId == *transitGatewayID {
+				if route.DestinationPrefixListId != nil && route.TransitGatewayId != nil && *route.DestinationPrefixListId == *prefixListID && *route.TransitGatewayId == *transitGatewayID {
 					// route already exists, nothing to do
 					return nil
 				}
