@@ -76,11 +76,29 @@ func (g *Cluster) Patch(ctx context.Context, cluster *capi.Cluster, patch client
 func (g *Cluster) AddFinalizer(ctx context.Context, capiCluster *capi.Cluster, finalizer string) error {
 	originalCluster := capiCluster.DeepCopy()
 	controllerutil.AddFinalizer(capiCluster, finalizer)
-	return g.Client.Patch(ctx, capiCluster, client.MergeFrom(originalCluster))
+	if err := g.Client.Patch(ctx, capiCluster, client.MergeFrom(originalCluster)); err != nil {
+		return err
+	}
+	capaCluster, err := g.GetAWSCluster(ctx, types.NamespacedName{Name: capiCluster.Name, Namespace: capiCluster.Namespace})
+	if err != nil {
+		return err
+	}
+	originalCAPACluster := capaCluster.DeepCopy()
+	controllerutil.AddFinalizer(capaCluster, finalizer)
+	return g.Client.Patch(ctx, capaCluster, client.MergeFrom(originalCAPACluster))
 }
 
 // RemoveFinalizer removes the given finalizer from the cluster
 func (g *Cluster) RemoveFinalizer(ctx context.Context, capiCluster *capi.Cluster, finalizer string) error {
+	capaCluster, err := g.GetAWSCluster(ctx, types.NamespacedName{Name: capiCluster.Name, Namespace: capiCluster.Namespace})
+	// Note: If error is not nil we're going to ignore it and continue removing the finalizer from the CAPI cluster
+	if err == nil {
+		originalCAPACluster := capaCluster.DeepCopy()
+		controllerutil.RemoveFinalizer(capaCluster, finalizer)
+		if err := g.Client.Patch(ctx, capaCluster, client.MergeFrom(originalCAPACluster)); err != nil {
+			return err
+		}
+	}
 	originalCluster := capiCluster.DeepCopy()
 	controllerutil.RemoveFinalizer(capiCluster, finalizer)
 	return g.Client.Patch(ctx, capiCluster, client.MergeFrom(originalCluster))
