@@ -5,7 +5,6 @@ import (
 
 	"github.com/giantswarm/microerror"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -134,7 +133,6 @@ func (g *Cluster) UpdateStatusCondition(ctx context.Context, cluster *capi.Clust
 	originalCluster := cluster.DeepCopy()
 	condition, _ := lookupConditionOrCreateUnknown(ctx, cluster, networkTopologyCondition)
 	condition.Status = status
-	condition.LastTransitionTime = metav1.Now()
 
 	capiconditions.Set(cluster, condition)
 	return g.Client.Status().Patch(ctx, cluster, client.MergeFrom(originalCluster))
