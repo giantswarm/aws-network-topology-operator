@@ -86,8 +86,6 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-
 	err := r.client.AddFinalizer(ctx, cluster, FinalizerNetTop)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
@@ -109,10 +107,7 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 	}
 
 	// We're ok to continue if this fails
-	if err := r.client.UpdateStatusCondition(ctx, cluster, corev1.ConditionTrue); err != nil {
-		logger.Error(err, "Failed to update status condition")
-	}
-	logger.Info("Status condition updated")
+	_ = r.client.UpdateStatusCondition(ctx, cluster, corev1.ConditionTrue)
 
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, nil
 }
