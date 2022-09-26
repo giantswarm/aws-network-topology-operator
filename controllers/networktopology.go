@@ -6,26 +6,28 @@ import (
 	"time"
 
 	"github.com/giantswarm/microerror"
-	corev1 "k8s.io/api/core/v1"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/annotations"
+	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
 )
 
-const FinalizerNetTop = "network-topology.finalizers.giantswarm.io"
+const (
+	FinalizerNetTop                             = "network-topology.finalizers.giantswarm.io"
+	networkTopologyCondition capi.ConditionType = "NetworkTopologyReady"
+)
 
 //counterfeiter:generate . ClusterClient
 type ClusterClient interface {
 	Get(context.Context, types.NamespacedName) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capi.Cluster, string) error
 	RemoveFinalizer(context.Context, *capi.Cluster, string) error
-	HasStatusCondition(ctx context.Context, cluster *capi.Cluster) bool
-	UpdateStatusCondition(ctx context.Context, cluster *capi.Cluster, status corev1.ConditionStatus) error
+	UpdateStatus(ctx context.Context, cluster *capi.Cluster) error
 }
 
 //counterfeiter:generate . Registrar
@@ -72,9 +74,10 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	if !r.client.HasStatusCondition(ctx, cluster) {
+	if !capiconditions.Has(cluster, networkTopologyCondition) {
+		capiconditions.MarkFalse(cluster, capi.ConditionType(networkTopologyCondition), "InProgress", capi.ConditionSeverityInfo, "")
 		// We're ok to continue if this fails
-		_ = r.client.UpdateStatusCondition(ctx, cluster, corev1.ConditionFalse)
+		_ = r.client.UpdateStatus(ctx, cluster)
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
@@ -106,8 +109,9 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 		}
 	}
 
+	capiconditions.MarkTrue(cluster, capi.ConditionType(networkTopologyCondition))
 	// We're ok to continue if this fails
-	_ = r.client.UpdateStatusCondition(ctx, cluster, corev1.ConditionTrue)
+	_ = r.client.UpdateStatus(ctx, cluster)
 
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, nil
 }

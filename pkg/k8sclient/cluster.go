@@ -4,16 +4,12 @@ import (
 	"context"
 
 	"github.com/giantswarm/microerror"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
-
-var networkTopologyCondition capi.ConditionType = "NetworkTopologyReady"
 
 type Cluster struct {
 	Client            client.Client
@@ -124,29 +120,6 @@ func (g *Cluster) GetAWSClusterRoleIdentity(ctx context.Context, namespacedName 
 	return identity, microerror.Mask(err)
 }
 
-func (g *Cluster) HasStatusCondition(ctx context.Context, cluster *capi.Cluster) bool {
-	_, found := lookupConditionOrCreateUnknown(ctx, cluster, networkTopologyCondition)
-	return found
-}
-
-func (g *Cluster) UpdateStatusCondition(ctx context.Context, cluster *capi.Cluster, status corev1.ConditionStatus) error {
-	originalCluster := cluster.DeepCopy()
-	condition, _ := lookupConditionOrCreateUnknown(ctx, cluster, networkTopologyCondition)
-	condition.Status = status
-
-	capiconditions.Set(cluster, condition)
-	return g.Client.Status().Patch(ctx, cluster, client.MergeFrom(originalCluster))
-}
-
-func lookupConditionOrCreateUnknown(ctx context.Context, cluster *capi.Cluster, conditionType capi.ConditionType) (*capi.Condition, bool) {
-	condition := capiconditions.Get(cluster, capi.ConditionType(networkTopologyCondition))
-
-	if condition != nil {
-		return condition, true
-	}
-
-	return &capi.Condition{
-		Type:   capi.ConditionType(conditionType),
-		Status: corev1.ConditionUnknown,
-	}, false
+func (g *Cluster) UpdateStatus(ctx context.Context, cluster *capi.Cluster) error {
+	return g.Client.Status().Update(ctx, cluster)
 }
