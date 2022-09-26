@@ -2,7 +2,6 @@ package k8sclient
 
 import (
 	"context"
-	"time"
 
 	"github.com/giantswarm/microerror"
 	corev1 "k8s.io/api/core/v1"
@@ -10,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -126,35 +126,29 @@ func (g *Cluster) GetAWSClusterRoleIdentity(ctx context.Context, namespacedName 
 }
 
 func (g *Cluster) HasStatusCondition(ctx context.Context, cluster *capi.Cluster) bool {
-	for _, c := range cluster.Status.Conditions {
-		if c.Type == networkTopologyCondition {
-			return true
-		}
-	}
-	return false
+	_, found := lookupConditionOrCreateUnknown(ctx, cluster, networkTopologyCondition)
+	return found
 }
 
 func (g *Cluster) UpdateStatusCondition(ctx context.Context, cluster *capi.Cluster, status corev1.ConditionStatus) error {
 	originalCluster := cluster.DeepCopy()
+	condition, _ := lookupConditionOrCreateUnknown(ctx, cluster, networkTopologyCondition)
+	condition.Status = status
+	condition.LastTransitionTime = metav1.Now()
 
-	found := false
-	condition := capi.Condition{
-		Type:               networkTopologyCondition,
-		Status:             status,
-		LastTransitionTime: metav1.Time{Time: time.Now()},
-	}
-
-	for _, c := range cluster.Status.Conditions {
-		if c.Type == networkTopologyCondition {
-			found = true
-			c.LastTransitionTime = condition.LastTransitionTime
-			c.Status = condition.Status
-		}
-	}
-
-	if !found {
-		cluster.Status.Conditions = append(cluster.Status.Conditions, condition)
-	}
-
+	capiconditions.Set(cluster, condition)
 	return g.Client.Status().Patch(ctx, cluster, client.MergeFrom(originalCluster))
+}
+
+func lookupConditionOrCreateUnknown(ctx context.Context, cluster *capi.Cluster, conditionType capi.ConditionType) (*capi.Condition, bool) {
+	condition := capiconditions.Get(cluster, capi.ConditionType(networkTopologyCondition))
+
+	if condition != nil {
+		return condition, true
+	}
+
+	return &capi.Condition{
+		Type:   capi.ConditionType(conditionType),
+		Status: corev1.ConditionUnknown,
+	}, false
 }

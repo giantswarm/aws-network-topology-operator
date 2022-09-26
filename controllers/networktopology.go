@@ -112,6 +112,7 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 	if err := r.client.UpdateStatusCondition(ctx, cluster, corev1.ConditionTrue); err != nil {
 		logger.Error(err, "Failed to update status condition")
 	}
+	logger.Info("Status condition updated")
 
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, nil
 }
