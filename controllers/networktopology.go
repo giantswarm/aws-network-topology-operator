@@ -76,7 +76,7 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if !capiconditions.Has(cluster, networkTopologyCondition) {
-		capiconditions.MarkFalse(cluster, capi.ConditionType(networkTopologyCondition), "InProgress", capi.ConditionSeverityInfo, "")
+		capiconditions.MarkFalse(cluster, networkTopologyCondition, "InProgress", capi.ConditionSeverityInfo, "")
 		// We're ok to continue if this fails
 		_ = r.client.UpdateStatus(ctx, cluster)
 	}
@@ -103,13 +103,13 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 		err = reg.Register(ctx, cluster)
 		if err != nil {
 			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
-				capiconditions.MarkFalse(cluster, capi.ConditionType(networkTopologyCondition), "ModeNotSupported", capi.ConditionSeverityError, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, nettopAnnotations.NetworkTopologyModeAnnotation))
+				capiconditions.MarkFalse(cluster, networkTopologyCondition, "ModeNotSupported", capi.ConditionSeverityError, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, nettopAnnotations.NetworkTopologyModeAnnotation))
 				return ctrl.Result{Requeue: false}, nil
 			} else if errors.Is(err, &registrar.TransitGatewayNotAvailableError{}) {
-				capiconditions.MarkFalse(cluster, capi.ConditionType(networkTopologyCondition), "TransitGatewayNotAvailable", capi.ConditionSeverityWarning, "The transit gateway is not yet available for attachment")
+				capiconditions.MarkFalse(cluster, networkTopologyCondition, "TransitGatewayNotAvailable", capi.ConditionSeverityWarning, "The transit gateway is not yet available for attachment")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
 			} else if errors.Is(err, &registrar.VPCNotReadyError{}) {
-				capiconditions.MarkFalse(cluster, capi.ConditionType(networkTopologyCondition), "VPCNotReady", capi.ConditionSeverityInfo, "The cluster's VPC is not yet ready")
+				capiconditions.MarkFalse(cluster, networkTopologyCondition, "VPCNotReady", capi.ConditionSeverityInfo, "The cluster's VPC is not yet ready")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
 			}
 
@@ -117,7 +117,7 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 		}
 	}
 
-	capiconditions.MarkTrue(cluster, capi.ConditionType(networkTopologyCondition))
+	capiconditions.MarkTrue(cluster, networkTopologyCondition)
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, nil
 }
 
