@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
+	nettopAnnotations "github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 )
 
 const (
@@ -94,14 +95,21 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
+	defer func() {
+		_ = r.client.UpdateStatus(ctx, cluster)
+	}()
+
 	for _, reg := range r.registrars {
 		err = reg.Register(ctx, cluster)
 		if err != nil {
 			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
+				capiconditions.MarkFalse(cluster, capi.ConditionType(networkTopologyCondition), "ModeNotSupported", capi.ConditionSeverityError, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, nettopAnnotations.NetworkTopologyModeAnnotation))
 				return ctrl.Result{Requeue: false}, nil
 			} else if errors.Is(err, &registrar.TransitGatewayNotAvailableError{}) {
+				capiconditions.MarkFalse(cluster, capi.ConditionType(networkTopologyCondition), "TransitGatewayNotAvailable", capi.ConditionSeverityWarning, "The transit gateway is not yet available for attachment")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
 			} else if errors.Is(err, &registrar.VPCNotReadyError{}) {
+				capiconditions.MarkFalse(cluster, capi.ConditionType(networkTopologyCondition), "VPCNotReady", capi.ConditionSeverityInfo, "The cluster's VPC is not yet ready")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
 			}
 
@@ -110,9 +118,6 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 	}
 
 	capiconditions.MarkTrue(cluster, capi.ConditionType(networkTopologyCondition))
-	// We're ok to continue if this fails
-	_ = r.client.UpdateStatus(ctx, cluster)
-
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, nil
 }
 
