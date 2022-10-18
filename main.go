@@ -62,6 +62,8 @@ func main() {
 	var probeAddr string
 	var managementClusterName string
 	var managementClusterNamespace string
+	var snsTopic string
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -69,6 +71,7 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&managementClusterName, "management-cluster-name", "", "The name of the Cluster CR for the management cluster")
 	flag.StringVar(&managementClusterNamespace, "management-cluster-namespace", "", "The namespace of the Cluster CR for the management cluster")
+	flag.StringVar(&snsTopic, "sns-topic", "", "The SNS topic to send TGW attatchment requests to when running in UserManaged mode")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -89,17 +92,6 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "bd3aa545.giantswarm.io",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -115,9 +107,10 @@ func main() {
 	client := k8sclient.NewCluster(mgr.GetClient(), managementCluster)
 
 	ec2Service := aws.NewEC2Client(ctx, client, managementCluster)
+	snsService := aws.NewSNSClient(ctx, snsTopic, client, managementCluster)
 
 	registrars := []controllers.Registrar{
-		registrar.NewTransitGateway(ec2Service, client),
+		registrar.NewTransitGateway(aws.NewTGWClient(*ec2Service, *snsService), client),
 	}
 	controller := controllers.NewNetworkTopologyReconciler(client, registrars)
 	err = controller.SetupWithManager(mgr)

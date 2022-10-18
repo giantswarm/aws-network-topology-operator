@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 
 	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 )
@@ -204,6 +205,21 @@ type FakeTransitGatewayClient struct {
 	}
 	modifyManagedPrefixListReturnsOnCall map[int]struct {
 		result1 *ec2.ModifyManagedPrefixListOutput
+		result2 error
+	}
+	PublishSNSMessageStub        func(context.Context, *sns.PublishInput, ...func(*sns.Options)) (*sns.PublishOutput, error)
+	publishSNSMessageMutex       sync.RWMutex
+	publishSNSMessageArgsForCall []struct {
+		arg1 context.Context
+		arg2 *sns.PublishInput
+		arg3 []func(*sns.Options)
+	}
+	publishSNSMessageReturns struct {
+		result1 *sns.PublishOutput
+		result2 error
+	}
+	publishSNSMessageReturnsOnCall map[int]struct {
+		result1 *sns.PublishOutput
 		result2 error
 	}
 	invocations      map[string][][]interface{}
@@ -1068,6 +1084,72 @@ func (fake *FakeTransitGatewayClient) ModifyManagedPrefixListReturnsOnCall(i int
 	}{result1, result2}
 }
 
+func (fake *FakeTransitGatewayClient) PublishSNSMessage(arg1 context.Context, arg2 *sns.PublishInput, arg3 ...func(*sns.Options)) (*sns.PublishOutput, error) {
+	fake.publishSNSMessageMutex.Lock()
+	ret, specificReturn := fake.publishSNSMessageReturnsOnCall[len(fake.publishSNSMessageArgsForCall)]
+	fake.publishSNSMessageArgsForCall = append(fake.publishSNSMessageArgsForCall, struct {
+		arg1 context.Context
+		arg2 *sns.PublishInput
+		arg3 []func(*sns.Options)
+	}{arg1, arg2, arg3})
+	stub := fake.PublishSNSMessageStub
+	fakeReturns := fake.publishSNSMessageReturns
+	fake.recordInvocation("PublishSNSMessage", []interface{}{arg1, arg2, arg3})
+	fake.publishSNSMessageMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2, arg3...)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeTransitGatewayClient) PublishSNSMessageCallCount() int {
+	fake.publishSNSMessageMutex.RLock()
+	defer fake.publishSNSMessageMutex.RUnlock()
+	return len(fake.publishSNSMessageArgsForCall)
+}
+
+func (fake *FakeTransitGatewayClient) PublishSNSMessageCalls(stub func(context.Context, *sns.PublishInput, ...func(*sns.Options)) (*sns.PublishOutput, error)) {
+	fake.publishSNSMessageMutex.Lock()
+	defer fake.publishSNSMessageMutex.Unlock()
+	fake.PublishSNSMessageStub = stub
+}
+
+func (fake *FakeTransitGatewayClient) PublishSNSMessageArgsForCall(i int) (context.Context, *sns.PublishInput, []func(*sns.Options)) {
+	fake.publishSNSMessageMutex.RLock()
+	defer fake.publishSNSMessageMutex.RUnlock()
+	argsForCall := fake.publishSNSMessageArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *FakeTransitGatewayClient) PublishSNSMessageReturns(result1 *sns.PublishOutput, result2 error) {
+	fake.publishSNSMessageMutex.Lock()
+	defer fake.publishSNSMessageMutex.Unlock()
+	fake.PublishSNSMessageStub = nil
+	fake.publishSNSMessageReturns = struct {
+		result1 *sns.PublishOutput
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeTransitGatewayClient) PublishSNSMessageReturnsOnCall(i int, result1 *sns.PublishOutput, result2 error) {
+	fake.publishSNSMessageMutex.Lock()
+	defer fake.publishSNSMessageMutex.Unlock()
+	fake.PublishSNSMessageStub = nil
+	if fake.publishSNSMessageReturnsOnCall == nil {
+		fake.publishSNSMessageReturnsOnCall = make(map[int]struct {
+			result1 *sns.PublishOutput
+			result2 error
+		})
+	}
+	fake.publishSNSMessageReturnsOnCall[i] = struct {
+		result1 *sns.PublishOutput
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeTransitGatewayClient) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -1097,6 +1179,8 @@ func (fake *FakeTransitGatewayClient) Invocations() map[string][][]interface{} {
 	defer fake.getManagedPrefixListEntriesMutex.RUnlock()
 	fake.modifyManagedPrefixListMutex.RLock()
 	defer fake.modifyManagedPrefixListMutex.RUnlock()
+	fake.publishSNSMessageMutex.RLock()
+	defer fake.publishSNSMessageMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

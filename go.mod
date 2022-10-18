@@ -11,10 +11,11 @@ replace (
 
 require (
 	github.com/aws/aws-sdk-go v1.44.80
-	github.com/aws/aws-sdk-go-v2 v1.16.11
+	github.com/aws/aws-sdk-go-v2 v1.16.16
 	github.com/aws/aws-sdk-go-v2/config v1.17.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.12.14
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.53.0
+	github.com/aws/aws-sdk-go-v2/service/sns v1.18.1
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.13
 	github.com/giantswarm/microerror v0.4.0
 	github.com/go-logr/logr v1.2.3
@@ -42,12 +43,12 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.12 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.18 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.12 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.23 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.17 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.12 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.11.17 // indirect
-	github.com/aws/smithy-go v1.12.1 // indirect
+	github.com/aws/smithy-go v1.13.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
