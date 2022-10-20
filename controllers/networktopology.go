@@ -103,7 +103,7 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 		err = reg.Register(ctx, cluster)
 		if err != nil {
 			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
-				capiconditions.MarkFalse(cluster, networkTopologyCondition, "ModeNotSupported", capi.ConditionSeverityError, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, nettopAnnotations.NetworkTopologyModeAnnotation))
+				capiconditions.MarkFalse(cluster, networkTopologyCondition, "ModeNotSupported", capi.ConditionSeverityInfo, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, nettopAnnotations.NetworkTopologyModeAnnotation))
 				return ctrl.Result{Requeue: false}, nil
 			} else if errors.Is(err, &registrar.TransitGatewayNotAvailableError{}) {
 				capiconditions.MarkFalse(cluster, networkTopologyCondition, "TransitGatewayNotAvailable", capi.ConditionSeverityWarning, "The transit gateway is not yet available for attachment")
@@ -111,6 +111,9 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 			} else if errors.Is(err, &registrar.VPCNotReadyError{}) {
 				capiconditions.MarkFalse(cluster, networkTopologyCondition, "VPCNotReady", capi.ConditionSeverityInfo, "The cluster's VPC is not yet ready")
 				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
+			} else if errors.Is(err, &registrar.IDNotProvidedError{}) {
+				capiconditions.MarkFalse(cluster, networkTopologyCondition, "RequiredIDMissing", capi.ConditionSeverityError, "The %s ID is missing from the annotations", err.(*registrar.IDNotProvidedError).ID)
+				return ctrl.Result{Requeue: false}, nil
 			}
 
 			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, microerror.Mask(err)

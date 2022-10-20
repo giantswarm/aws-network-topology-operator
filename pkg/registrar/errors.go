@@ -42,3 +42,16 @@ func (e *VPCNotReadyError) Error() string {
 func (e *VPCNotReadyError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
+
+type IDNotProvidedError struct {
+	error
+	ID string
+}
+
+func (e *IDNotProvidedError) Error() string {
+	return fmt.Sprintf("%s ID not provided: %s", e.ID, e.Error())
+}
+
+func (e *IDNotProvidedError) Is(target error) bool {
+	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}
