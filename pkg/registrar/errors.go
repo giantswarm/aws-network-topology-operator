@@ -49,7 +49,7 @@ type IDNotProvidedError struct {
 }
 
 func (e *IDNotProvidedError) Error() string {
-	return fmt.Sprintf("%s ID not provided: %s", e.ID, e.Error())
+	return fmt.Sprintf("%s ID not provided: %s", e.ID, e.error.Error())
 }
 
 func (e *IDNotProvidedError) Is(target error) bool {
