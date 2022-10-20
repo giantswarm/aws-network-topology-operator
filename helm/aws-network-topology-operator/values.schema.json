@@ -75,6 +75,14 @@
                     "type": "string"
                 }
             }
+        },
+        "userManaged": {
+            "type": "object",
+            "properties": {
+                "snsTopic": {
+                    "type": "string"
+                }
+            }
         }
     }
 }
