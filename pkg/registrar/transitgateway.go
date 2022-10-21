@@ -6,6 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/go-logr/logr"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -73,14 +75,106 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 		fallthrough
 
 	case annotations.NetworkTopologyModeNone:
-		// TODO: Handle `None` topology mode
 		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeNone)
 		return &ModeNotSupportedError{Mode: val}
 
 	case annotations.NetworkTopologyModeUserManaged:
-		// TODO: Handle `UserManaged` mode
-		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeUserManaged)
-		return &ModeNotSupportedError{Mode: val}
+		var err error
+		var tgw *types.TransitGateway
+
+		prefixListID := annotations.GetNetworkTopologyPrefixListID(cluster)
+		if prefixListID == "" {
+			return &IDNotProvidedError{ID: "PrefixList"}
+		}
+
+		if r.clusterClient.IsManagementCluster(ctx, cluster) {
+			if gatewayID == "" {
+				return &IDNotProvidedError{ID: "TransitGateway"}
+			}
+
+			tgw, err = r.getTransitGateway(ctx, gatewayID)
+			if err != nil {
+				return err
+			}
+		} else {
+			if gatewayID == "" {
+				// No TGW ID specified so we'll use the one associated with the MC
+				mc, err := r.clusterClient.GetManagementCluster(ctx)
+				if err != nil {
+					logger.Error(err, "Failed to get management cluster")
+					return err
+				}
+
+				gatewayID = annotations.GetNetworkTopologyTransitGatewayID(mc)
+				if gatewayID == "" {
+					err = fmt.Errorf("management cluster doesn't have a TGW specified")
+					logger.Error(err, "The Management Cluster doesn't have a Transit Gateway ID specified")
+					return err
+				}
+			}
+
+			tgw, err = r.getTransitGateway(ctx, gatewayID)
+			if err != nil {
+				return err
+			}
+			if tgw == nil {
+				err = fmt.Errorf("failed to find TransitGateway for provided ID")
+				logger.Error(err, "No TransitGateway found for ID provided on annotations", "transitGatewayID", gatewayID)
+				return err
+			}
+		}
+
+		// Ensure TGW ID is saved back to the current cluster
+		baseCluster := cluster.DeepCopy()
+		annotations.SetNetworkTopologyTransitGatewayID(cluster, *tgw.TransitGatewayId)
+		if cluster, err = r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
+			logger.Error(err, "Failed to patch cluster resource with TGW ID")
+			return err
+		}
+
+		awsCluster, err := r.getAWSCluster(ctx, cluster)
+		if err != nil {
+			logger.Error(err, "Failed to get AWSCluster for Cluster")
+			return err
+		}
+
+		var tgwAttachment *types.TransitGatewayVpcAttachment
+		if awsCluster.Spec.NetworkSpec.VPC.ID == "" {
+			logger.Info("vpc not yet ready, skipping attachment for now", "transitGatewayID", tgw.TransitGatewayId)
+			return &VPCNotReadyError{}
+		} else if tgw.State == types.TransitGatewayStateAvailable {
+			tgwAttachment, err = r.attachTransitGateway(ctx, tgw.TransitGatewayId, awsCluster)
+			if err != nil {
+				return err
+			}
+		} else {
+			logger.Info("transit gateway not available, skipping attachment for now", "transitGatewayID", tgw.TransitGatewayId, "tgwState", tgw.State)
+			return &TransitGatewayNotAvailableError{}
+		}
+
+		if tgwAttachment.State == types.TransitGatewayAttachmentStateInitiating || tgwAttachment.State == types.TransitGatewayAttachmentStateInitiatingRequest ||
+			tgwAttachment.State == types.TransitGatewayAttachmentStatePending || tgwAttachment.State == types.TransitGatewayAttachmentStatePendingAcceptance {
+			logger.Info("Sending SNS message")
+
+			_, err = r.transitGatewayClient.PublishSNSMessage(ctx, &sns.PublishInput{
+				Message: aws.String("Request TransitGatewayAttachment"),
+				MessageAttributes: map[string]snstypes.MessageAttributeValue{
+					"Postfach":      {DataType: aws.String("String"), StringValue: aws.String("")},
+					"Account_ID":    {DataType: aws.String("String"), StringValue: tgwAttachment.VpcOwnerId},
+					"Attachment_ID": {DataType: aws.String("String"), StringValue: tgwAttachment.TransitGatewayAttachmentId},
+					"CIDR":          {DataType: aws.String("String"), StringValue: &awsCluster.Spec.NetworkSpec.VPC.CidrBlock},
+					"Name":          {DataType: aws.String("String"), StringValue: &cluster.ObjectMeta.Name},
+				},
+			})
+			if err != nil {
+				logger.Error(err, "Failed sending SNS message")
+				return err
+			}
+		}
+
+		if err := r.addRoutes(ctx, tgw.TransitGatewayId, &prefixListID, awsCluster); err != nil {
+			return err
+		}
 
 	case annotations.NetworkTopologyModeGiantSwarmManaged:
 		var err error
@@ -137,7 +231,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			logger.Info("vpc not yet ready, skipping attachment for now", "transitGatewayID", tgw.TransitGatewayId)
 			return &VPCNotReadyError{}
 		} else if tgw.State == types.TransitGatewayStateAvailable {
-			if err := r.attachTransitGateway(ctx, tgw.TransitGatewayId, awsCluster); err != nil {
+			if _, err := r.attachTransitGateway(ctx, tgw.TransitGatewayId, awsCluster); err != nil {
 				return err
 			}
 		} else {
@@ -150,7 +244,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return err
 		}
 
-		// Ensure TGW ID is saved back to the current cluster
+		// Ensure PrefixListID is saved back to the current cluster
 		baseCluster = cluster.DeepCopy()
 		annotations.SetNetworkTopologyPrefixListID(cluster, prefixListID)
 		if _, err = r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
@@ -179,12 +273,18 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 
 	switch val := annotations.GetAnnotation(cluster, annotations.NetworkTopologyModeAnnotation); val {
 	case annotations.NetworkTopologyModeNone:
-		// TODO: Handle `None` topology mode
 		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeNone)
 
 	case annotations.NetworkTopologyModeUserManaged:
-		// TODO: Handle `UserManaged` mode
-		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeUserManaged)
+		awsCluster, err := r.getAWSCluster(ctx, cluster)
+		if err != nil {
+			logger.Error(err, "Failed to get AWSCluster for Cluster")
+			return err
+		}
+
+		if err := r.detachTransitGateway(ctx, &gatewayID, awsCluster); err != nil {
+			return err
+		}
 
 	case annotations.NetworkTopologyModeGiantSwarmManaged:
 		awsCluster, err := r.getAWSCluster(ctx, cluster)
@@ -296,7 +396,7 @@ func (r *TransitGateway) getOrCreateTransitGateway(ctx context.Context, gatewayI
 	return tgw, nil
 }
 
-func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *string, awsCluster *capa.AWSCluster) error {
+func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *string, awsCluster *capa.AWSCluster) (*types.TransitGatewayVpcAttachment, error) {
 	logger := r.getLogger(ctx)
 
 	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
@@ -308,7 +408,7 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	if vpcID == "" || len(subnets) == 0 {
 		err := fmt.Errorf("cluster network not yet available on AWSCluster resource")
 		logger.Error(err, "AWSCluster does not yet have network details available")
-		return err
+		return nil, err
 	}
 
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
@@ -326,7 +426,7 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	attachments, err := r.transitGatewayClient.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
 	if err != nil {
 		logger.Error(err, "Failed to get transit gateway attachments", "transitGatewayID", gatewayID)
-		return err
+		return nil, err
 	}
 
 	if attachments != nil && len(attachments.TransitGatewayVpcAttachments) == 0 {
@@ -348,13 +448,16 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 		})
 		if err != nil {
 			logger.Error(err, "Failed to create transit gateway attachments", "transitGatewayID", gatewayID, "vpcID", vpcID)
-			return err
+			return nil, err
 		}
 
 		logger.Info("TransitGateway attached to VPC", "vpcID", vpcID, "transitGatewayID", gatewayID, "transitGatewayAttachmentId", output.TransitGatewayVpcAttachment.TransitGatewayAttachmentId)
+		return output.TransitGatewayVpcAttachment, nil
+	} else if len(attachments.TransitGatewayVpcAttachments) == 1 {
+		return &attachments.TransitGatewayVpcAttachments[0], nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *string, awsCluster *capa.AWSCluster) error {

@@ -33,6 +33,9 @@ spec:
             - --leader-elect
             - --management-cluster-name={{ required "The name of the management cluster is required" .Values.managementCluster.name }}
             - --management-cluster-namespace={{ required "The namespace of the management cluster is required" .Values.managementCluster.namespace }}
+            {{- if .Values.userManaged.snsTopic }}
+            - --sns-topic={{.Values.userManaged.snsTopic }}
+            {{- end }}
           env:
           - name: AWS_SHARED_CREDENTIALS_FILE
             value: /home/.aws/credentials
