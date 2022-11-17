@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix incorrectly skipping adding prefix list to route tables when one of the route tables already has it but others don't
+
 ## [1.2.0] - 2022-10-21
 
 ### Added
