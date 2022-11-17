@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2022-11-17
+
 ### Fixed
 
 - Fix incorrectly skipping adding prefix list to route tables when one of the route tables already has it but others don't
@@ -193,7 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.1.2...v1.1.3
