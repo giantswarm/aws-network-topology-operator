@@ -578,12 +578,15 @@ func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefix
 
 	if output != nil && len(output.RouteTables) > 0 {
 		for _, rt := range output.RouteTables {
-
+			matchFound := false
 			for _, route := range rt.Routes {
 				if route.DestinationPrefixListId != nil && route.TransitGatewayId != nil && *route.DestinationPrefixListId == *prefixListID && *route.TransitGatewayId == *transitGatewayID {
-					// route already exists, nothing to do
-					return nil
+					// route already exists
+					matchFound = true
 				}
+			}
+			if matchFound {
+				continue
 			}
 
 			_, err = r.transitGatewayClient.CreateRoute(ctx, &ec2.CreateRouteInput{
