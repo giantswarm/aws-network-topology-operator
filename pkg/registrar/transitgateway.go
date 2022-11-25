@@ -159,7 +159,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			_, err = r.transitGatewayClient.PublishSNSMessage(ctx, &sns.PublishInput{
 				Message: aws.String("Request TransitGatewayAttachment"),
 				MessageAttributes: map[string]snstypes.MessageAttributeValue{
-					"Postfach":      {DataType: aws.String("String"), StringValue: aws.String("")},
+					"Postfach":      {DataType: aws.String("String"), StringValue: aws.String("support@giantswarm.io")},
 					"Account_ID":    {DataType: aws.String("String"), StringValue: tgwAttachment.VpcOwnerId},
 					"Attachment_ID": {DataType: aws.String("String"), StringValue: tgwAttachment.TransitGatewayAttachmentId},
 					"CIDR":          {DataType: aws.String("String"), StringValue: &awsCluster.Spec.NetworkSpec.VPC.CidrBlock},
