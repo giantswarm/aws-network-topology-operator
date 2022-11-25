@@ -37,7 +37,8 @@ Handles the setup / configuration of high-level AWS networking to allow cross-VP
                 "ec2:GetManagedPrefixListEntries",
                 "ec2:DeleteRoute",
                 "ec2:CreateRoute",
-                "ec2:DescribeRouteTables"
+                "ec2:DescribeRouteTables",
+                "sns:Publish", // Needed if using `UserManaged` mode
             ],
             "Resource": "*"
         }
