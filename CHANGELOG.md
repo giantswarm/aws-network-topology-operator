@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Add missing RBAC permissions to create k8s events.
+
 ## [1.2.2] - 2022-11-25
 
 ### Fixed
