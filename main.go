@@ -21,11 +21,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	gocache "github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -108,16 +110,28 @@ func main() {
 
 	ec2Service := aws.NewEC2Client(ctx, client, managementCluster)
 	snsService := aws.NewSNSClient(ctx, snsTopic, client, managementCluster)
+
+	// Cache EC2 clients to avoid lots of credential requests due to client recreation
+	expiration := 5 * time.Minute
+	transitGatewayClientForWorkloadClusterEC2ClientCache := gocache.New(expiration, expiration/2)
 	getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) aws.TransitGatewayClient {
-		ec2ServiceWorkloadCluster := aws.NewEC2Client(
-			ctx,
+		v, ok := transitGatewayClientForWorkloadClusterEC2ClientCache.Get(workloadCluster.String())
+		var ec2ServiceWorkloadCluster *aws.EC2Client
+		if ok {
+			ec2ServiceWorkloadCluster = v.(*aws.EC2Client)
+		} else {
+			ec2ServiceWorkloadCluster = aws.NewEC2Client(
+				ctx,
 
-			// k8s client points to management cluster since that has the `AWSCluster` object which
-			// in turn references `AWSClusterRoleIdentity` to determine the AWS account of the
-			// workload cluster
-			client,
+				// k8s client points to management cluster since that has the `AWSCluster` object which
+				// in turn references `AWSClusterRoleIdentity` to determine the AWS account of the
+				// workload cluster
+				client,
 
-			workloadCluster)
+				workloadCluster)
+
+			transitGatewayClientForWorkloadClusterEC2ClientCache.SetDefault(workloadCluster.String(), ec2ServiceWorkloadCluster)
+		}
 
 		return aws.NewTGWClient(*ec2ServiceWorkloadCluster, *snsService)
 	}
