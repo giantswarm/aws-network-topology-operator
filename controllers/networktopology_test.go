@@ -1149,6 +1149,100 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 			})
 
+			When("the cluster with existing transit gateway attachment gets deleted", func() {
+				BeforeEach(func() {
+					mcCluster, mcAWSCluster := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+								{
+									TransitGatewayId:           &transitGatewayID,
+									TransitGatewayAttachmentId: &transitGatewayID,
+									VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
+								},
+							},
+						},
+						nil,
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(mcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      mcCluster.ObjectMeta.Name,
+							Namespace: mcCluster.ObjectMeta.Namespace,
+						},
+					}
+
+					// Creation
+					_, reconcileErr = reconciler.Reconcile(ctx, request)
+					Expect(reconcileErr).NotTo(HaveOccurred())
+
+					Expect(k8sClient.Delete(ctx, mcCluster)).To(Succeed())
+				})
+
+				It("detach the transit gateway attachment but not the management cluster's transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+					Expect(transitGatewayClient.DeleteTransitGatewayCallCount()).To(Equal(0))
+
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+				})
+			})
 		})
 
 		When("the cluster is a Workload Cluster", func() {
@@ -1597,6 +1691,109 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(reconcileErr).To(HaveOccurred())
 					Expect(reconcileErr.Error()).To(ContainSubstring("failed to find TransitGateway for provided ID"))
 					Expect(result.Requeue).To(BeTrue())
+				})
+			})
+
+			When("the cluster with existing transit gateway attachment gets deleted", func() {
+				BeforeEach(func() {
+					wcCluster, wcAWSCluster := newCluster(
+						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+						},
+						wcVPCId,
+					)
+
+					mcCluster, _ := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+								{
+									TransitGatewayId:           &transitGatewayID,
+									TransitGatewayAttachmentId: &transitGatewayID,
+									VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+								},
+							},
+						},
+						nil,
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(wcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      wcCluster.ObjectMeta.Name,
+							Namespace: wcCluster.ObjectMeta.Namespace,
+						},
+					}
+
+					// Creation
+					_, reconcileErr = reconciler.Reconcile(ctx, request)
+					Expect(reconcileErr).NotTo(HaveOccurred())
+
+					Expect(k8sClient.Delete(ctx, wcCluster)).To(Succeed())
+				})
+
+				It("detach the transit gateway attachment but not the management cluster's transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+					Expect(transitGatewayClient.DeleteTransitGatewayCallCount()).To(Equal(0))
+
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 				})
 			})
 		})
