@@ -42,14 +42,16 @@ type ClusterClient interface {
 }
 
 type TransitGateway struct {
-	transitGatewayClient awsclient.TransitGatewayClient
-	clusterClient        ClusterClient
+	transitGatewayClient                      awsclient.TransitGatewayClient
+	clusterClient                             ClusterClient
+	getTransitGatewayClientForWorkloadCluster func(workloadCluster k8stypes.NamespacedName) awsclient.TransitGatewayClient
 }
 
-func NewTransitGateway(transitGatewayClient awsclient.TransitGatewayClient, clusterClient ClusterClient) *TransitGateway {
+func NewTransitGateway(transitGatewayClient awsclient.TransitGatewayClient, clusterClient ClusterClient, getTransitGatewayClientForWorkloadCluster func(workloadCluster k8stypes.NamespacedName) awsclient.TransitGatewayClient) *TransitGateway {
 	return &TransitGateway{
 		transitGatewayClient: transitGatewayClient,
 		clusterClient:        clusterClient,
+		getTransitGatewayClientForWorkloadCluster: getTransitGatewayClientForWorkloadCluster,
 	}
 }
 
@@ -411,6 +413,13 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 		return nil, err
 	}
 
+	// Attachments from VPC to the transit gateway need to be made from the AWS account
+	// of the workload cluster, so we use a separate client
+	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
+		Name:      awsCluster.ObjectMeta.Name,
+		Namespace: awsCluster.ObjectMeta.Namespace,
+	})
+
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
 		Filters: []types.Filter{
 			{
@@ -423,14 +432,14 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 			},
 		},
 	}
-	attachments, err := r.transitGatewayClient.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
+	attachments, err := transitGatewayAttachmentClient.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
 	if err != nil {
 		logger.Error(err, "Failed to get transit gateway attachments", "transitGatewayID", gatewayID)
 		return nil, err
 	}
 
 	if attachments != nil && len(attachments.TransitGatewayVpcAttachments) == 0 {
-		output, err := r.transitGatewayClient.CreateTransitGatewayVpcAttachment(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
+		output, err := transitGatewayAttachmentClient.CreateTransitGatewayVpcAttachment(ctx, &ec2.CreateTransitGatewayVpcAttachmentInput{
 			TransitGatewayId: gatewayID,
 			VpcId:            &vpcID,
 			SubnetIds:        subnets,
@@ -478,14 +487,19 @@ func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *st
 		},
 	}
 
-	attachments, err := r.transitGatewayClient.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
+	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
+		Name:      awsCluster.ObjectMeta.Name,
+		Namespace: awsCluster.ObjectMeta.Namespace,
+	})
+
+	attachments, err := transitGatewayAttachmentClient.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)
 	if err != nil {
 		logger.Error(err, "Failed to get transit gateway attachments", "transitGatewayID", gatewayID)
 		return err
 	}
 
 	for _, tgwAttachment := range attachments.TransitGatewayVpcAttachments {
-		_, err := r.transitGatewayClient.DeleteTransitGatewayVpcAttachment(ctx, &ec2.DeleteTransitGatewayVpcAttachmentInput{
+		_, err := transitGatewayAttachmentClient.DeleteTransitGatewayVpcAttachment(ctx, &ec2.DeleteTransitGatewayVpcAttachmentInput{
 			TransitGatewayAttachmentId: tgwAttachment.TransitGatewayAttachmentId,
 		})
 		if err != nil {

@@ -108,9 +108,22 @@ func main() {
 
 	ec2Service := aws.NewEC2Client(ctx, client, managementCluster)
 	snsService := aws.NewSNSClient(ctx, snsTopic, client, managementCluster)
+	getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) aws.TransitGatewayClient {
+		ec2ServiceWorkloadCluster := aws.NewEC2Client(
+			ctx,
+
+			// k8s client points to management cluster since that has the `AWSCluster` object which
+			// in turn references `AWSClusterRoleIdentity` to determine the AWS account of the
+			// workload cluster
+			client,
+
+			workloadCluster)
+
+		return aws.NewTGWClient(*ec2ServiceWorkloadCluster, *snsService)
+	}
 
 	registrars := []controllers.Registrar{
-		registrar.NewTransitGateway(aws.NewTGWClient(*ec2Service, *snsService), client),
+		registrar.NewTransitGateway(aws.NewTGWClient(*ec2Service, *snsService), client, getTransitGatewayClientForWorkloadCluster),
 	}
 	controller := controllers.NewNetworkTopologyReconciler(client, registrars)
 	err = controller.SetupWithManager(mgr)
