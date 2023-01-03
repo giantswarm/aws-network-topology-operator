@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2023-01-03
+
 ### Fixed
 
 - Fix deletion issue when the AWSCluster is already gone but finalizer was not removed.
@@ -212,7 +214,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.3...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.4...HEAD
+[1.2.4]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.0...v1.2.1
