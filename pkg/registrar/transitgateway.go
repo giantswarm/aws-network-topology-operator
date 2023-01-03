@@ -10,6 +10,7 @@ import (
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -279,7 +280,10 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 
 	case annotations.NetworkTopologyModeUserManaged:
 		awsCluster, err := r.getAWSCluster(ctx, cluster)
-		if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Info("AWSCluster is already deleted, skipping transit gateway deletion")
+			return nil
+		} else if err != nil {
 			logger.Error(err, "Failed to get AWSCluster for Cluster")
 			return err
 		}
@@ -290,7 +294,10 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 
 	case annotations.NetworkTopologyModeGiantSwarmManaged:
 		awsCluster, err := r.getAWSCluster(ctx, cluster)
-		if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Info("AWSCluster is already deleted, skipping transit gateway deletion")
+			return nil
+		} else if err != nil {
 			logger.Error(err, "Failed to get AWSCluster for Cluster")
 			return err
 		}

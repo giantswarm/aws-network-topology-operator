@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix deletion issue when the AWSCluster is already gone but finalizer was not removed.
 - Fix attaching VPC to transit gateway if workload cluster is in another AWS account
 
 ## [1.2.3] - 2022-11-29
