@@ -53,9 +53,10 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      # Ensure that for every commit to master, and for every new release tag,
+      # Ensure that for every commit to `main`, and for every new release tag,
       # an image gets pushed to the Aliyun registry.
       - architect/push-to-docker:
+          context: architect
           name: push-to-aliyun
           image: "registry-intl.cn-shanghai.aliyuncs.com/giantswarm/aws-network-topology-operator"
           username_envar: "ALIYUN_USERNAME"
@@ -64,7 +65,7 @@ workflows:
             - go-build
           filters:
             branches:
-              only: master
+              only: main
             tags:
               only: /^v.*/
 
