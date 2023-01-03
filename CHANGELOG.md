@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix deletion issue when the AWSCluster is already gone but finalizer was not removed.
+
 ## [1.2.3] - 2022-11-29
 
 ### Fixed
