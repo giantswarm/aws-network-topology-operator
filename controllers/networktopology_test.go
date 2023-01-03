@@ -21,6 +21,7 @@ import (
 
 	"github.com/giantswarm/aws-network-topology-operator/controllers"
 	"github.com/giantswarm/aws-network-topology-operator/controllers/controllersfakes"
+	awsclient "github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/aws/awsfakes"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
@@ -37,10 +38,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 	var (
 		ctx context.Context
 
-		reconciler           *controllers.NetworkTopologyReconciler
-		clusterClient        ClusterClient
-		fakeRegistrar        *controllersfakes.FakeRegistrar
-		transitGatewayClient *awsfakes.FakeTransitGatewayClient
+		reconciler                             *controllers.NetworkTopologyReconciler
+		clusterClient                          ClusterClient
+		fakeRegistrar                          *controllersfakes.FakeRegistrar
+		transitGatewayClient                   *awsfakes.FakeTransitGatewayClient
+		transitGatewayClientForWorkloadCluster *awsfakes.FakeTransitGatewayClient
 
 		transitGatewayID = "abc-123"
 		prefixListID     = "prefix-123"
@@ -253,7 +255,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
 				[]controllers.Registrar{
-					registrar.NewTransitGateway(new(awsfakes.FakeTransitGatewayClient), clusterClient),
+					registrar.NewTransitGateway(new(awsfakes.FakeTransitGatewayClient), clusterClient, nil),
 				},
 			)
 
@@ -299,7 +301,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
 				[]controllers.Registrar{
-					registrar.NewTransitGateway(new(awsfakes.FakeTransitGatewayClient), clusterClient),
+					registrar.NewTransitGateway(new(awsfakes.FakeTransitGatewayClient), clusterClient, nil),
 				},
 			)
 
@@ -348,7 +350,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				nil,
 			)
 
-			transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+			transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+			transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
 				&ec2.CreateTransitGatewayVpcAttachmentOutput{
 					TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
 						TransitGatewayAttachmentId: &transitGatewayID,
@@ -356,11 +359,14 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				},
 				nil,
 			)
+			getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+				panic("Should not be called in this test case")
+			}
 
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
 				[]controllers.Registrar{
-					registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+					registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 				},
 			)
 
@@ -396,7 +402,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
 
-		When("the cluster is an Management Cluster", func() {
+		When("the cluster is a Management Cluster", func() {
 			BeforeEach(func() {
 				mcCluster, wcAWSCluster := newCluster(
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
@@ -422,25 +428,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					nil,
 				)
 
-				transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
-					&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
-						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
-					},
-					nil,
-				)
-
-				transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
-					&ec2.CreateTransitGatewayVpcAttachmentOutput{
-						TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
-							TransitGatewayAttachmentId: &transitGatewayID,
-							TransitGatewayId:           &transitGatewayID,
-							VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
-							State:                      awstypes.TransitGatewayAttachmentStatePending,
-						},
-					},
-					nil,
-				)
-
 				transitGatewayClient.DescribeRouteTablesReturns(
 					&ec2.DescribeRouteTablesOutput{
 						RouteTables: []awstypes.RouteTable{
@@ -458,10 +445,33 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Namespace: mcCluster.ObjectMeta.Namespace,
 				})
 
+				transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+				transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+					&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+					},
+					nil,
+				)
+				transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
+					&ec2.CreateTransitGatewayVpcAttachmentOutput{
+						TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+							TransitGatewayAttachmentId: &transitGatewayID,
+							TransitGatewayId:           &transitGatewayID,
+							VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							State:                      awstypes.TransitGatewayAttachmentStatePending,
+						},
+					},
+					nil,
+				)
+				getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+					Expect(workloadCluster.Name).To((Equal(wcAWSCluster.Name)))
+					return transitGatewayClientForWorkloadCluster
+				}
+
 				reconciler = controllers.NewNetworkTopologyReconciler(
 					clusterClient,
 					[]controllers.Registrar{
-						registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					},
 				)
 
@@ -478,9 +488,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			})
 
 			It("should create a transit gateway attachment", func() {
-				Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+				// Management vs. workload cluster AWS account
+				Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 
-				_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+				_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 				Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 					ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 					Tags: []awstypes.Tag{
@@ -539,25 +551,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					nil,
 				)
 
-				transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
-					&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
-						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
-					},
-					nil,
-				)
-
-				transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
-					&ec2.CreateTransitGatewayVpcAttachmentOutput{
-						TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
-							TransitGatewayAttachmentId: &transitGatewayID,
-							TransitGatewayId:           &transitGatewayID,
-							VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
-							State:                      awstypes.TransitGatewayAttachmentStatePending,
-						},
-					},
-					nil,
-				)
-
 				transitGatewayClient.DescribeRouteTablesReturns(
 					&ec2.DescribeRouteTablesOutput{
 						RouteTables: []awstypes.RouteTable{
@@ -575,10 +568,33 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Namespace: mcCluster.ObjectMeta.Namespace,
 				})
 
+				transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+				transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+					&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+					},
+					nil,
+				)
+				transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
+					&ec2.CreateTransitGatewayVpcAttachmentOutput{
+						TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+							TransitGatewayAttachmentId: &transitGatewayID,
+							TransitGatewayId:           &transitGatewayID,
+							VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							State:                      awstypes.TransitGatewayAttachmentStatePending,
+						},
+					},
+					nil,
+				)
+				getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+					Expect(workloadCluster.Name).To((Equal(wcAWSCluster.Name)))
+					return transitGatewayClientForWorkloadCluster
+				}
+
 				reconciler = controllers.NewNetworkTopologyReconciler(
 					clusterClient,
 					[]controllers.Registrar{
-						registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					},
 				)
 
@@ -595,9 +611,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			})
 
 			It("should create a transit gateway attachment", func() {
-				Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+				// Management vs. workload cluster AWS account
+				Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 
-				_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+				_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 				Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 					ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 					Tags: []awstypes.Tag{
@@ -646,20 +664,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					nil,
 				)
 
-				transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
-					&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
-						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
-							{
-								TransitGatewayAttachmentId: &transitGatewayID,
-								TransitGatewayId:           &transitGatewayID,
-								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
-								State:                      awstypes.TransitGatewayAttachmentStateAvailable,
-							},
-						},
-					},
-					nil,
-				)
-
 				transitGatewayClient.DescribeRouteTablesReturns(
 					&ec2.DescribeRouteTablesOutput{
 						RouteTables: []awstypes.RouteTable{
@@ -677,10 +681,29 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Namespace: mcCluster.ObjectMeta.Namespace,
 				})
 
+				transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+				transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+					&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+							{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+								State:                      awstypes.TransitGatewayAttachmentStateAvailable,
+							},
+						},
+					},
+					nil,
+				)
+				getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+					Expect(workloadCluster.Name).To((Equal(wcAWSCluster.Name)))
+					return transitGatewayClientForWorkloadCluster
+				}
+
 				reconciler = controllers.NewNetworkTopologyReconciler(
 					clusterClient,
 					[]controllers.Registrar{
-						registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					},
 				)
 
@@ -697,7 +720,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			})
 
 			It("should not create a transit gateway attachment", func() {
+				// Management vs. workload cluster AWS account
 				Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
 			})
 
 			It("should not send the SNS message", func() {
@@ -727,7 +752,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				nil,
 			)
 
-			transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+			transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+			transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
 				&ec2.CreateTransitGatewayVpcAttachmentOutput{
 					TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
 						TransitGatewayAttachmentId: &transitGatewayID,
@@ -735,11 +761,14 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				},
 				nil,
 			)
+			getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+				panic("Should not be called in this test case")
+			}
 
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
 				[]controllers.Registrar{
-					registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+					registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 				},
 			)
 
@@ -779,7 +808,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
 
-		When("the cluster is an Management Cluster", func() {
+		When("the cluster is a Management Cluster", func() {
 
 			When("the cluster is new", func() {
 				BeforeEach(func() {
@@ -800,29 +829,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
-					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
-						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
-							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
-						},
-						nil,
-					)
-
 					transitGatewayClient.CreateTransitGatewayReturns(
 						&ec2.CreateTransitGatewayOutput{
 							TransitGateway: &awstypes.TransitGateway{
 								TransitGatewayId: &transitGatewayID,
 								State:            awstypes.TransitGatewayStateAvailable,
-							},
-						},
-						nil,
-					)
-
-					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
-						&ec2.CreateTransitGatewayVpcAttachmentOutput{
-							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
-								TransitGatewayAttachmentId: &transitGatewayID,
-								TransitGatewayId:           &transitGatewayID,
-								VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
 							},
 						},
 						nil,
@@ -855,10 +866,32 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Namespace: mcCluster.ObjectMeta.Namespace,
 					})
 
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+						},
+						nil,
+					)
+					transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
+						&ec2.CreateTransitGatewayVpcAttachmentOutput{
+							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							},
+						},
+						nil,
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(mcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
 						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 						},
 					)
 
@@ -886,9 +919,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should create a transit gateway attachment", func() {
-					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 
-					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
@@ -931,24 +966,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
-					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
-						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
-							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
-						},
-						nil,
-					)
-
-					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
-						&ec2.CreateTransitGatewayVpcAttachmentOutput{
-							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
-								TransitGatewayAttachmentId: &transitGatewayID,
-								TransitGatewayId:           &transitGatewayID,
-								VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
-							},
-						},
-						nil,
-					)
-
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
@@ -970,10 +987,32 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Namespace: mcCluster.ObjectMeta.Namespace,
 					})
 
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+						},
+						nil,
+					)
+					transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
+						&ec2.CreateTransitGatewayVpcAttachmentOutput{
+							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							},
+						},
+						nil,
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(mcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
 						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 						},
 					)
 
@@ -990,9 +1029,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should create a transit gateway attachment", func() {
-					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 
-					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
@@ -1035,7 +1076,29 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
-					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
 						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
 							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
 								{
@@ -1047,10 +1110,68 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						},
 						nil,
 					)
-
-					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
+					transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
 						nil,
 						fmt.Errorf("Conflict"),
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(mcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      mcCluster.ObjectMeta.Name,
+							Namespace: mcCluster.ObjectMeta.Namespace,
+						},
+					}
+				})
+
+				It("should not create a new transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+				})
+
+				It("should not create a transit gateway attachment", func() {
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				})
+
+				It("should not create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
+				})
+			})
+
+			When("the cluster with existing transit gateway attachment gets deleted", func() {
+				BeforeEach(func() {
+					mcCluster, mcAWSCluster := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
+							},
+						},
+						nil,
 					)
 
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
@@ -1074,10 +1195,28 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Namespace: mcCluster.ObjectMeta.Namespace,
 					})
 
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+								{
+									TransitGatewayId:           &transitGatewayID,
+									TransitGatewayAttachmentId: &transitGatewayID,
+									VpcId:                      &mcAWSCluster.Spec.NetworkSpec.VPC.ID,
+								},
+							},
+						},
+						nil,
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(mcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
 						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 						},
 					)
 
@@ -1087,21 +1226,23 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 							Namespace: mcCluster.ObjectMeta.Namespace,
 						},
 					}
+
+					// Creation
+					_, reconcileErr = reconciler.Reconcile(ctx, request)
+					Expect(reconcileErr).NotTo(HaveOccurred())
+
+					Expect(k8sClient.Delete(ctx, mcCluster)).To(Succeed())
 				})
 
-				It("should not create a new transit gateway", func() {
+				It("detach the transit gateway attachment but not the management cluster's transit gateway", func() {
 					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
-				})
+					Expect(transitGatewayClient.DeleteTransitGatewayCallCount()).To(Equal(0))
 
-				It("should not create a transit gateway attachment", func() {
-					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
-				})
-
-				It("should not create routes on subnet route tables", func() {
-					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 				})
 			})
-
 		})
 
 		When("the cluster is a Workload Cluster", func() {
@@ -1138,24 +1279,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
-					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
-						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
-							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
-						},
-						nil,
-					)
-
-					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
-						&ec2.CreateTransitGatewayVpcAttachmentOutput{
-							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
-								TransitGatewayAttachmentId: &transitGatewayID,
-								TransitGatewayId:           &transitGatewayID,
-								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
-							},
-						},
-						nil,
-					)
-
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
@@ -1177,10 +1300,32 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Namespace: mcCluster.ObjectMeta.Namespace,
 					})
 
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+						},
+						nil,
+					)
+					transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
+						&ec2.CreateTransitGatewayVpcAttachmentOutput{
+							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							},
+						},
+						nil,
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(wcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
 						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 						},
 					)
 
@@ -1197,9 +1342,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should create a transit gateway attachment", func() {
-					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 
-					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
@@ -1248,24 +1395,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
-					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
-						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
-							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
-						},
-						nil,
-					)
-
-					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
-						&ec2.CreateTransitGatewayVpcAttachmentOutput{
-							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
-								TransitGatewayAttachmentId: &transitGatewayID,
-								TransitGatewayId:           &transitGatewayID,
-								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
-							},
-						},
-						nil,
-					)
-
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
@@ -1287,10 +1416,32 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Namespace: mcCluster.ObjectMeta.Namespace,
 					})
 
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+						},
+						nil,
+					)
+					transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
+						&ec2.CreateTransitGatewayVpcAttachmentOutput{
+							TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+								TransitGatewayAttachmentId: &transitGatewayID,
+								TransitGatewayId:           &transitGatewayID,
+								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+							},
+						},
+						nil,
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(wcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
 						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 						},
 					)
 
@@ -1307,9 +1458,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should create a transit gateway attachment", func() {
-					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 
-					_, payload, _ := transitGatewayClient.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
@@ -1357,24 +1510,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						nil,
 					)
 
-					transitGatewayClient.DescribeTransitGatewayVpcAttachmentsReturns(
-						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
-							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
-								{
-									TransitGatewayId:           &transitGatewayID,
-									TransitGatewayAttachmentId: &transitGatewayID,
-									VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
-								},
-							},
-						},
-						nil,
-					)
-
-					transitGatewayClient.CreateTransitGatewayVpcAttachmentReturns(
-						nil,
-						fmt.Errorf("Conflict"),
-					)
-
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
@@ -1396,10 +1531,32 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Namespace: mcCluster.ObjectMeta.Namespace,
 					})
 
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+								{
+									TransitGatewayId:           &transitGatewayID,
+									TransitGatewayAttachmentId: &transitGatewayID,
+									VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+								},
+							},
+						},
+						nil,
+					)
+					transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(
+						nil,
+						fmt.Errorf("Conflict"),
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(wcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
 						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 						},
 					)
 
@@ -1415,8 +1572,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
 				})
 
-				It("should create a transit gateway attachment", func() {
+				It("should not create a transit gateway attachment", func() {
+					// Management vs. workload cluster AWS account
 					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
 				})
 			})
 
@@ -1445,10 +1604,16 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Namespace: mcCluster.ObjectMeta.Namespace,
 					})
 
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(wcCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
 						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 						},
 					)
 
@@ -1501,10 +1666,16 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Namespace: mcCluster.ObjectMeta.Namespace,
 					})
 
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(wcCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
 						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient),
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 						},
 					)
 
@@ -1520,6 +1691,109 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(reconcileErr).To(HaveOccurred())
 					Expect(reconcileErr.Error()).To(ContainSubstring("failed to find TransitGateway for provided ID"))
 					Expect(result.Requeue).To(BeTrue())
+				})
+			})
+
+			When("the cluster with existing transit gateway attachment gets deleted", func() {
+				BeforeEach(func() {
+					wcCluster, wcAWSCluster := newCluster(
+						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+						},
+						wcVPCId,
+					)
+
+					mcCluster, _ := newCluster(
+						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
+						map[string]string{
+							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
+							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						},
+						mcVPCId,
+					)
+
+					transitGatewayClient = new(awsfakes.FakeTransitGatewayClient)
+
+					transitGatewayClient.DescribeTransitGatewaysReturns(
+						&ec2.DescribeTransitGatewaysOutput{
+							TransitGateways: []awstypes.TransitGateway{
+								{
+									TransitGatewayId: &transitGatewayID,
+									State:            awstypes.TransitGatewayStateAvailable,
+								},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.DescribeManagedPrefixListsReturns(
+						&ec2.DescribeManagedPrefixListsOutput{
+							PrefixLists: []awstypes.ManagedPrefixList{
+								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+							},
+						},
+						nil,
+					)
+
+					transitGatewayClient.GetManagedPrefixListEntriesReturns(
+						&ec2.GetManagedPrefixListEntriesOutput{
+							Entries: []awstypes.PrefixListEntry{},
+						},
+						nil,
+					)
+
+					clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
+						Name:      mcCluster.ObjectMeta.Name,
+						Namespace: mcCluster.ObjectMeta.Namespace,
+					})
+
+					transitGatewayClientForWorkloadCluster = new(awsfakes.FakeTransitGatewayClient)
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
+						&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+							TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+								{
+									TransitGatewayId:           &transitGatewayID,
+									TransitGatewayAttachmentId: &transitGatewayID,
+									VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
+								},
+							},
+						},
+						nil,
+					)
+					getTransitGatewayClientForWorkloadCluster := func(workloadCluster types.NamespacedName) awsclient.TransitGatewayClient {
+						Expect(workloadCluster.Name).To((Equal(wcAWSCluster.Name)))
+						return transitGatewayClientForWorkloadCluster
+					}
+
+					reconciler = controllers.NewNetworkTopologyReconciler(
+						clusterClient,
+						[]controllers.Registrar{
+							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
+						},
+					)
+
+					request = ctrl.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      wcCluster.ObjectMeta.Name,
+							Namespace: wcCluster.ObjectMeta.Namespace,
+						},
+					}
+
+					// Creation
+					_, reconcileErr = reconciler.Reconcile(ctx, request)
+					Expect(reconcileErr).NotTo(HaveOccurred())
+
+					Expect(k8sClient.Delete(ctx, wcCluster)).To(Succeed())
+				})
+
+				It("detach the transit gateway attachment but not the management cluster's transit gateway", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
+					Expect(transitGatewayClient.DeleteTransitGatewayCallCount()).To(Equal(0))
+
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
 				})
 			})
 		})
