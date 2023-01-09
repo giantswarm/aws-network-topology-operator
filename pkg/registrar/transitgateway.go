@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -62,14 +63,14 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 
 	gatewayID := annotations.GetNetworkTopologyTransitGatewayID(cluster)
 
-	switch val := annotations.GetAnnotation(cluster, annotations.NetworkTopologyModeAnnotation); val {
+	switch val := annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation); val {
 	case "":
 		// If no value currently set, we'll set to the default of 'None"
 		logger.Info("NetworkTopologyMode is currently unset, setting to the default of 'None'")
 
 		baseCluster := cluster.DeepCopy()
 		annotations.AddAnnotations(cluster, map[string]string{
-			annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeNone,
+			annotation.NetworkTopologyModeAnnotation: annotation.NetworkTopologyModeNone,
 		})
 		if _, err := r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
 			logger.Error(err, "Failed to save cluster resource")
@@ -77,11 +78,11 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 		}
 		fallthrough
 
-	case annotations.NetworkTopologyModeNone:
-		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeNone)
+	case annotation.NetworkTopologyModeNone:
+		logger.Info("Mode currently not handled", "mode", annotation.NetworkTopologyModeNone)
 		return &ModeNotSupportedError{Mode: val}
 
-	case annotations.NetworkTopologyModeUserManaged:
+	case annotation.NetworkTopologyModeUserManaged:
 		var err error
 		var tgw *types.TransitGateway
 
@@ -179,7 +180,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return err
 		}
 
-	case annotations.NetworkTopologyModeGiantSwarmManaged:
+	case annotation.NetworkTopologyModeGiantSwarmManaged:
 		var err error
 		var tgw *types.TransitGateway
 
@@ -274,11 +275,11 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 
 	gatewayID := annotations.GetNetworkTopologyTransitGatewayID(cluster)
 
-	switch val := annotations.GetAnnotation(cluster, annotations.NetworkTopologyModeAnnotation); val {
-	case annotations.NetworkTopologyModeNone:
-		logger.Info("Mode currently not handled", "mode", annotations.NetworkTopologyModeNone)
+	switch val := annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation); val {
+	case annotation.NetworkTopologyModeNone:
+		logger.Info("Mode currently not handled", "mode", annotation.NetworkTopologyModeNone)
 
-	case annotations.NetworkTopologyModeUserManaged:
+	case annotation.NetworkTopologyModeUserManaged:
 		awsCluster, err := r.getAWSCluster(ctx, cluster)
 		if errors.IsNotFound(err) {
 			logger.Info("AWSCluster is already deleted, skipping transit gateway deletion")
@@ -292,7 +293,7 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 			return err
 		}
 
-	case annotations.NetworkTopologyModeGiantSwarmManaged:
+	case annotation.NetworkTopologyModeGiantSwarmManaged:
 		awsCluster, err := r.getAWSCluster(ctx, cluster)
 		if errors.IsNotFound(err) {
 			logger.Info("AWSCluster is already deleted, skipping transit gateway deletion")

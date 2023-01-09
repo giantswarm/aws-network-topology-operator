@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/giantswarm/microerror"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -103,7 +104,7 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 		err = reg.Register(ctx, cluster)
 		if err != nil {
 			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
-				capiconditions.MarkFalse(cluster, networkTopologyCondition, "ModeNotSupported", capi.ConditionSeverityInfo, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, nettopAnnotations.NetworkTopologyModeAnnotation))
+				capiconditions.MarkFalse(cluster, networkTopologyCondition, "ModeNotSupported", capi.ConditionSeverityInfo, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation))
 				return ctrl.Result{Requeue: false}, nil
 			} else if errors.Is(err, &registrar.TransitGatewayNotAvailableError{}) {
 				capiconditions.MarkFalse(cluster, networkTopologyCondition, "TransitGatewayNotAvailable", capi.ConditionSeverityWarning, "The transit gateway is not yet available for attachment")

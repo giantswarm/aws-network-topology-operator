@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	awstypes "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go/aws"
+	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -25,7 +26,6 @@ import (
 	"github.com/giantswarm/aws-network-topology-operator/pkg/aws/awsfakes"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
-	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 	"github.com/giantswarm/aws-network-topology-operator/tests"
 )
 
@@ -205,7 +205,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Name:      mc.Name,
 					Namespace: mc.Namespace,
 					Annotations: map[string]string{
-						annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 					},
 				},
 				Spec: capi.ClusterSpec{
@@ -262,7 +262,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			patchedCluster := cluster.DeepCopy()
 			patchedCluster.Finalizers = []string{controllers.FinalizerNetTop}
 			patchedCluster.Annotations = map[string]string{
-				annotations.NetworkTopologyModeAnnotation: "",
+				gsannotation.NetworkTopologyModeAnnotation: "",
 			}
 			Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
 
@@ -276,8 +276,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualAnnotation := actualCluster.Annotations[annotations.NetworkTopologyModeAnnotation]
-			Expect(actualAnnotation).To(Equal(annotations.NetworkTopologyModeNone))
+			actualAnnotation := actualCluster.Annotations[gsannotation.NetworkTopologyModeAnnotation]
+			Expect(actualAnnotation).To(Equal(gsannotation.NetworkTopologyModeNone))
 		})
 
 		It("should not set the gateway ID", func() {
@@ -285,7 +285,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualID := actualCluster.Annotations[annotations.NetworkTopologyTransitGatewayIDAnnotation]
+			actualID := actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]
 			Expect(actualID).To(BeEmpty())
 		})
 
@@ -308,7 +308,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			patchedCluster := cluster.DeepCopy()
 			patchedCluster.Finalizers = []string{controllers.FinalizerNetTop}
 			patchedCluster.Annotations = map[string]string{
-				annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeNone,
+				gsannotation.NetworkTopologyModeAnnotation: gsannotation.NetworkTopologyModeNone,
 			}
 			Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
 
@@ -322,9 +322,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualMode := actualCluster.Annotations[annotations.NetworkTopologyModeAnnotation]
-			Expect(actualMode).To(Equal(annotations.NetworkTopologyModeNone))
-			actualID := actualCluster.Annotations[annotations.NetworkTopologyTransitGatewayIDAnnotation]
+			actualMode := actualCluster.Annotations[gsannotation.NetworkTopologyModeAnnotation]
+			Expect(actualMode).To(Equal(gsannotation.NetworkTopologyModeNone))
+			actualID := actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]
 			Expect(actualID).To(BeEmpty())
 		})
 
@@ -373,9 +373,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			patchedCluster := cluster.DeepCopy()
 			patchedCluster.Finalizers = []string{controllers.FinalizerNetTop}
 			patchedCluster.Annotations = map[string]string{
-				annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeUserManaged,
-				annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
-				annotations.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+				gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
+				gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+				gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 			}
 			Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
 
@@ -389,10 +389,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualMode := actualCluster.Annotations[annotations.NetworkTopologyModeAnnotation]
-			Expect(actualMode).To(Equal(annotations.NetworkTopologyModeUserManaged))
+			actualMode := actualCluster.Annotations[gsannotation.NetworkTopologyModeAnnotation]
+			Expect(actualMode).To(Equal(gsannotation.NetworkTopologyModeUserManaged))
 
-			actualID := actualCluster.Annotations[annotations.NetworkTopologyTransitGatewayIDAnnotation]
+			actualID := actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]
 			Expect(actualID).To(Equal(transitGatewayID))
 		})
 
@@ -407,9 +407,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				mcCluster, wcAWSCluster := newCluster(
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
-						annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeUserManaged,
-						annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
-						annotations.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
 				)
@@ -520,9 +520,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				wcCluster, wcAWSCluster := newCluster(
 					fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
-						annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeUserManaged,
-						annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
-						annotations.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					wcVPCId,
 				)
@@ -530,9 +530,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				mcCluster, _ := newCluster(
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
-						annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeUserManaged,
-						annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
-						annotations.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
 				)
@@ -643,9 +643,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				mcCluster, wcAWSCluster := newCluster(
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
-						annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeUserManaged,
-						annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
-						annotations.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
 				)
@@ -775,7 +775,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			patchedCluster := cluster.DeepCopy()
 			patchedCluster.Finalizers = []string{controllers.FinalizerNetTop}
 			patchedCluster.Annotations = map[string]string{
-				annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+				gsannotation.NetworkTopologyModeAnnotation: gsannotation.NetworkTopologyModeGiantSwarmManaged,
 			}
 			Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
 
@@ -789,8 +789,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualMode := actualCluster.Annotations[annotations.NetworkTopologyModeAnnotation]
-			Expect(actualMode).To(Equal(annotations.NetworkTopologyModeGiantSwarmManaged))
+			actualMode := actualCluster.Annotations[gsannotation.NetworkTopologyModeAnnotation]
+			Expect(actualMode).To(Equal(gsannotation.NetworkTopologyModeGiantSwarmManaged))
 		})
 
 		It("should set the gateway ID annotation value", func() {
@@ -798,7 +798,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
 			Expect(err).NotTo(HaveOccurred())
 
-			actualID := actualCluster.Annotations[annotations.NetworkTopologyTransitGatewayIDAnnotation]
+			actualID := actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]
 			Expect(actualID).To(Equal(transitGatewayID))
 		})
 
@@ -815,7 +815,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, mcAWSCluster := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyModeAnnotation: gsannotation.NetworkTopologyModeGiantSwarmManaged,
 						},
 						mcVPCId,
 					)
@@ -946,8 +946,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, mcAWSCluster := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						mcVPCId,
 					)
@@ -1056,8 +1056,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, mcAWSCluster := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						mcVPCId,
 					)
@@ -1154,8 +1154,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, mcAWSCluster := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						mcVPCId,
 					)
@@ -1251,7 +1251,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					wcCluster, wcAWSCluster := newCluster(
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyModeAnnotation: gsannotation.NetworkTopologyModeGiantSwarmManaged,
 						},
 						wcVPCId,
 					)
@@ -1259,8 +1259,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, _ := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						mcVPCId,
 					)
@@ -1366,8 +1366,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					wcCluster, wcAWSCluster := newCluster(
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						wcVPCId,
 					)
@@ -1375,8 +1375,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, _ := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						mcVPCId,
 					)
@@ -1481,8 +1481,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					wcCluster, wcAWSCluster := newCluster(
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						wcVPCId,
 					)
@@ -1490,8 +1490,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, _ := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						mcVPCId,
 					)
@@ -1584,7 +1584,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					wcCluster, _ := newCluster(
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyModeAnnotation: gsannotation.NetworkTopologyModeGiantSwarmManaged,
 						},
 						wcVPCId,
 					)
@@ -1592,7 +1592,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, _ := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeNone,
+							gsannotation.NetworkTopologyModeAnnotation: gsannotation.NetworkTopologyModeNone,
 						},
 						mcVPCId,
 					)
@@ -1638,8 +1638,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					wcCluster, _ := newCluster(
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: "not-exist",
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: "not-exist",
 						},
 						wcVPCId,
 					)
@@ -1647,7 +1647,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, _ := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyModeAnnotation: gsannotation.NetworkTopologyModeGiantSwarmManaged,
 						},
 						mcVPCId,
 					)
@@ -1699,7 +1699,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					wcCluster, wcAWSCluster := newCluster(
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation: annotations.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyModeAnnotation: gsannotation.NetworkTopologyModeGiantSwarmManaged,
 						},
 						wcVPCId,
 					)
@@ -1707,8 +1707,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					mcCluster, _ := newCluster(
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
-							annotations.NetworkTopologyModeAnnotation:             annotations.NetworkTopologyModeGiantSwarmManaged,
-							annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 						},
 						mcVPCId,
 					)
