@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Use annotations from k8smetadata package.
+
+### Fixed
+
 - Fix pushing image to AliYun
 
 ## [1.2.4] - 2023-01-03

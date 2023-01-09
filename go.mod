@@ -2,15 +2,6 @@ module github.com/giantswarm/aws-network-topology-operator
 
 go 1.18
 
-replace (
-	// Fix non CVE vulnerability: sonatype-2021-1401 in miekg/dns v1.0.14
-	github.com/miekg/dns => github.com/miekg/dns v1.1.50
-	// Fix non CVE vulnerability: sonatype-2019-0890 in pkg/sftp v1.10.1
-	github.com/pkg/sftp => github.com/pkg/sftp v1.13.5
-	// Fix for CWE-400: Uncontrolled Resource Consumption ('Resource Exhaustion')
-	golang.org/x/text => golang.org/x/text v0.3.8
-)
-
 require (
 	github.com/aws/aws-sdk-go v1.44.80
 	github.com/aws/aws-sdk-go-v2 v1.16.16
@@ -19,6 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.53.0
 	github.com/aws/aws-sdk-go-v2/service/sns v1.18.1
 	github.com/aws/aws-sdk-go-v2/service/sts v1.16.13
+	github.com/giantswarm/k8smetadata v0.17.0
 	github.com/giantswarm/microerror v0.4.0
 	github.com/go-logr/logr v1.2.3
 	github.com/google/uuid v1.3.0
@@ -112,4 +104,13 @@ require (
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
+)
+
+replace (
+	// Fix non CVE vulnerability: sonatype-2021-1401 in miekg/dns v1.0.14
+	github.com/miekg/dns => github.com/miekg/dns v1.1.50
+	// Fix non CVE vulnerability: sonatype-2019-0890 in pkg/sftp v1.10.1
+	github.com/pkg/sftp => github.com/pkg/sftp v1.13.5
+	// Fix for CWE-400: Uncontrolled Resource Consumption ('Resource Exhaustion')
+	golang.org/x/text => golang.org/x/text v0.3.8
 )

@@ -1,42 +1,43 @@
 package annotations
 
 import (
+	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func HasNetworkTopologyMode(o metav1.Object) bool {
-	return hasAnnotation(o, NetworkTopologyModeAnnotation)
+	return hasAnnotation(o, gsannotation.NetworkTopologyModeAnnotation)
 }
 
 func IsNetworkTopologyModeGiantSwarmManaged(o metav1.Object) bool {
-	return GetAnnotation(o, NetworkTopologyModeAnnotation) == NetworkTopologyModeGiantSwarmManaged
+	return GetAnnotation(o, gsannotation.NetworkTopologyModeAnnotation) == gsannotation.NetworkTopologyModeGiantSwarmManaged
 }
 
 func IsNetworkTopologyModeUserManaged(o metav1.Object) bool {
-	return GetAnnotation(o, NetworkTopologyModeAnnotation) == NetworkTopologyModeUserManaged
+	return GetAnnotation(o, gsannotation.NetworkTopologyModeAnnotation) == gsannotation.NetworkTopologyModeUserManaged
 }
 
 func IsNetworkTopologyModeNone(o metav1.Object) bool {
-	return GetAnnotation(o, NetworkTopologyModeAnnotation) == NetworkTopologyModeNone
+	return GetAnnotation(o, gsannotation.NetworkTopologyModeAnnotation) == gsannotation.NetworkTopologyModeNone
 }
 
 func GetNetworkTopologyTransitGatewayID(o metav1.Object) string {
-	return GetAnnotation(o, NetworkTopologyTransitGatewayIDAnnotation)
+	return GetAnnotation(o, gsannotation.NetworkTopologyTransitGatewayIDAnnotation)
 }
 
 func GetNetworkTopologyPrefixListID(o metav1.Object) string {
-	return GetAnnotation(o, NetworkTopologyPrefixListIDAnnotation)
+	return GetAnnotation(o, gsannotation.NetworkTopologyPrefixListIDAnnotation)
 }
 
 func SetNetworkTopologyTransitGatewayID(o metav1.Object, transitGatewayID string) {
 	AddAnnotations(o, map[string]string{
-		NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+		gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 	})
 }
 
 func SetNetworkTopologyPrefixListID(o metav1.Object, prefixListID string) {
 	AddAnnotations(o, map[string]string{
-		NetworkTopologyPrefixListIDAnnotation: prefixListID,
+		gsannotation.NetworkTopologyPrefixListIDAnnotation: prefixListID,
 	})
 }
 
