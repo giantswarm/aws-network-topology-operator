@@ -37,9 +37,18 @@ clear-envtest-cache: ## Clear envtest ports cache
 test-unit: ginkgo generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 8 --cover -r -randomize-all --randomize-suites --skip-package=tests ./...
 
+.PHONY: start-localstack
+start-localstack: docker-compose ## Run localstack with docker-compose
+	$(DOCKER_COMPOSE) up --detach --wait
+
+.PHONY: stop-localstack
+stop-localstack: docker-compose ## Run localstack with docker-compose
+	$(DOCKER_COMPOSE) stop
+
 .PHONY: test-integration
-test-integration: ginkgo envtest ## Run integration tests
+test-integration: ginkgo start-localstack ## Run integration tests
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 8 -r -randomize-all --randomize-suites --slow-spec-threshold "30s" tests/integration/
+	$(MAKE) stop-localstack
 
 .PHONY: test-acceptance
 test-acceptance: KUBECONFIG=$(HOME)/.kube/$(CLUSTER).yml
@@ -127,6 +136,14 @@ clusterctl: ## Download clusterctl locally if necessary.
 	$(eval LATEST_RELEASE = $(shell curl -s https://api.github.com/repos/kubernetes-sigs/cluster-api/releases/latest | jq -r '.tag_name'))
 	curl -sL "https://github.com/kubernetes-sigs/cluster-api/releases/download/$(LATEST_RELEASE)/clusterctl-linux-amd64" -o $(CLUSTERCTL)
 	chmod +x $(CLUSTERCTL)
+
+DOCKER_COMPOSE = $(shell pwd)/bin/docker-compose
+.PHONY: docker-compose
+docker-compose: ## Download docker-compose locally if necessary.
+	$(eval LATEST_RELEASE = $(shell curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name'))
+	curl -sL "https://github.com/docker/compose/releases/download/$(LATEST_RELEASE)/docker-compose-linux-x86_64" -o $(DOCKER_COMPOSE)
+	chmod +x $(DOCKER_COMPOSE)
+
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
