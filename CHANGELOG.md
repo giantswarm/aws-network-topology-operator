@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix pushing image to AliYun
+- Fix pushing image to AliYun.
+- Use proper date format in logs.
 
 ## [1.2.4] - 2023-01-03
 
