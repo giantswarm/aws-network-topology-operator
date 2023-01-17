@@ -5,9 +5,8 @@ import (
 	"context"
 	"sync"
 
-	"sigs.k8s.io/cluster-api/api/v1beta1"
-
 	"github.com/giantswarm/aws-network-topology-operator/controllers"
+	"sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type FakeRegistrar struct {

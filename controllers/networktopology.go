@@ -9,6 +9,7 @@ import (
 	"github.com/giantswarm/microerror"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
@@ -30,6 +31,7 @@ type ClusterClient interface {
 	AddFinalizer(context.Context, *capi.Cluster, string) error
 	RemoveFinalizer(context.Context, *capi.Cluster, string) error
 	UpdateStatus(ctx context.Context, cluster *capi.Cluster) error
+	GetAWSClusterRoleIdentity(context.Context, types.NamespacedName) (*capa.AWSClusterRoleIdentity, error)
 }
 
 //counterfeiter:generate . Registrar

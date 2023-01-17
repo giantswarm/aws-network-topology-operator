@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
+	v1beta1a "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	"sigs.k8s.io/cluster-api/api/v1beta1"
 
 	"github.com/giantswarm/aws-network-topology-operator/controllers"
@@ -37,6 +38,20 @@ type FakeClusterClient struct {
 	}
 	getReturnsOnCall map[int]struct {
 		result1 *v1beta1.Cluster
+		result2 error
+	}
+	GetAWSClusterRoleIdentityStub        func(context.Context, types.NamespacedName) (*v1beta1a.AWSClusterRoleIdentity, error)
+	getAWSClusterRoleIdentityMutex       sync.RWMutex
+	getAWSClusterRoleIdentityArgsForCall []struct {
+		arg1 context.Context
+		arg2 types.NamespacedName
+	}
+	getAWSClusterRoleIdentityReturns struct {
+		result1 *v1beta1a.AWSClusterRoleIdentity
+		result2 error
+	}
+	getAWSClusterRoleIdentityReturnsOnCall map[int]struct {
+		result1 *v1beta1a.AWSClusterRoleIdentity
 		result2 error
 	}
 	RemoveFinalizerStub        func(context.Context, *v1beta1.Cluster, string) error
@@ -196,6 +211,71 @@ func (fake *FakeClusterClient) GetReturnsOnCall(i int, result1 *v1beta1.Cluster,
 	}{result1, result2}
 }
 
+func (fake *FakeClusterClient) GetAWSClusterRoleIdentity(arg1 context.Context, arg2 types.NamespacedName) (*v1beta1a.AWSClusterRoleIdentity, error) {
+	fake.getAWSClusterRoleIdentityMutex.Lock()
+	ret, specificReturn := fake.getAWSClusterRoleIdentityReturnsOnCall[len(fake.getAWSClusterRoleIdentityArgsForCall)]
+	fake.getAWSClusterRoleIdentityArgsForCall = append(fake.getAWSClusterRoleIdentityArgsForCall, struct {
+		arg1 context.Context
+		arg2 types.NamespacedName
+	}{arg1, arg2})
+	stub := fake.GetAWSClusterRoleIdentityStub
+	fakeReturns := fake.getAWSClusterRoleIdentityReturns
+	fake.recordInvocation("GetAWSClusterRoleIdentity", []interface{}{arg1, arg2})
+	fake.getAWSClusterRoleIdentityMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeClusterClient) GetAWSClusterRoleIdentityCallCount() int {
+	fake.getAWSClusterRoleIdentityMutex.RLock()
+	defer fake.getAWSClusterRoleIdentityMutex.RUnlock()
+	return len(fake.getAWSClusterRoleIdentityArgsForCall)
+}
+
+func (fake *FakeClusterClient) GetAWSClusterRoleIdentityCalls(stub func(context.Context, types.NamespacedName) (*v1beta1a.AWSClusterRoleIdentity, error)) {
+	fake.getAWSClusterRoleIdentityMutex.Lock()
+	defer fake.getAWSClusterRoleIdentityMutex.Unlock()
+	fake.GetAWSClusterRoleIdentityStub = stub
+}
+
+func (fake *FakeClusterClient) GetAWSClusterRoleIdentityArgsForCall(i int) (context.Context, types.NamespacedName) {
+	fake.getAWSClusterRoleIdentityMutex.RLock()
+	defer fake.getAWSClusterRoleIdentityMutex.RUnlock()
+	argsForCall := fake.getAWSClusterRoleIdentityArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeClusterClient) GetAWSClusterRoleIdentityReturns(result1 *v1beta1a.AWSClusterRoleIdentity, result2 error) {
+	fake.getAWSClusterRoleIdentityMutex.Lock()
+	defer fake.getAWSClusterRoleIdentityMutex.Unlock()
+	fake.GetAWSClusterRoleIdentityStub = nil
+	fake.getAWSClusterRoleIdentityReturns = struct {
+		result1 *v1beta1a.AWSClusterRoleIdentity
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeClusterClient) GetAWSClusterRoleIdentityReturnsOnCall(i int, result1 *v1beta1a.AWSClusterRoleIdentity, result2 error) {
+	fake.getAWSClusterRoleIdentityMutex.Lock()
+	defer fake.getAWSClusterRoleIdentityMutex.Unlock()
+	fake.GetAWSClusterRoleIdentityStub = nil
+	if fake.getAWSClusterRoleIdentityReturnsOnCall == nil {
+		fake.getAWSClusterRoleIdentityReturnsOnCall = make(map[int]struct {
+			result1 *v1beta1a.AWSClusterRoleIdentity
+			result2 error
+		})
+	}
+	fake.getAWSClusterRoleIdentityReturnsOnCall[i] = struct {
+		result1 *v1beta1a.AWSClusterRoleIdentity
+		result2 error
+	}{result1, result2}
+}
+
 func (fake *FakeClusterClient) RemoveFinalizer(arg1 context.Context, arg2 *v1beta1.Cluster, arg3 string) error {
 	fake.removeFinalizerMutex.Lock()
 	ret, specificReturn := fake.removeFinalizerReturnsOnCall[len(fake.removeFinalizerArgsForCall)]
@@ -328,6 +408,8 @@ func (fake *FakeClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.addFinalizerMutex.RUnlock()
 	fake.getMutex.RLock()
 	defer fake.getMutex.RUnlock()
+	fake.getAWSClusterRoleIdentityMutex.RLock()
+	defer fake.getAWSClusterRoleIdentityMutex.RUnlock()
 	fake.removeFinalizerMutex.RLock()
 	defer fake.removeFinalizerMutex.RUnlock()
 	fake.updateStatusMutex.RLock()
