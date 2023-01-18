@@ -1829,4 +1829,26 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
 	})
+
+	When("the cluster is deleted and doesn't have our network topology finalizer", func() {
+		BeforeEach(func() {
+			actualCluster := &capi.Cluster{}
+			err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(clusterClient.RemoveFinalizer(ctx, actualCluster, controllers.FinalizerNetTop)).To(Succeed())
+			Expect(actualCluster.Finalizers).NotTo(ContainElement(controllers.FinalizerNetTop))
+
+			Expect(clusterClient.AddFinalizer(ctx, actualCluster, "testing")).To(Succeed())
+
+			Expect(k8sClient.Delete(ctx, actualCluster)).To(Succeed())
+		})
+
+		FIt("does not requeue the event", func() {
+			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
+			Expect(reconcileErr).NotTo(HaveOccurred())
+		})
+
+	})
 })

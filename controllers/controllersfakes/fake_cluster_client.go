@@ -25,6 +25,18 @@ type FakeClusterClient struct {
 	addFinalizerReturnsOnCall map[int]struct {
 		result1 error
 	}
+	ContainsFinalizerStub        func(*v1beta1.Cluster, string) bool
+	containsFinalizerMutex       sync.RWMutex
+	containsFinalizerArgsForCall []struct {
+		arg1 *v1beta1.Cluster
+		arg2 string
+	}
+	containsFinalizerReturns struct {
+		result1 bool
+	}
+	containsFinalizerReturnsOnCall map[int]struct {
+		result1 bool
+	}
 	GetStub        func(context.Context, types.NamespacedName) (*v1beta1.Cluster, error)
 	getMutex       sync.RWMutex
 	getArgsForCall []struct {
@@ -128,6 +140,68 @@ func (fake *FakeClusterClient) AddFinalizerReturnsOnCall(i int, result1 error) {
 	}
 	fake.addFinalizerReturnsOnCall[i] = struct {
 		result1 error
+	}{result1}
+}
+
+func (fake *FakeClusterClient) ContainsFinalizer(arg1 *v1beta1.Cluster, arg2 string) bool {
+	fake.containsFinalizerMutex.Lock()
+	ret, specificReturn := fake.containsFinalizerReturnsOnCall[len(fake.containsFinalizerArgsForCall)]
+	fake.containsFinalizerArgsForCall = append(fake.containsFinalizerArgsForCall, struct {
+		arg1 *v1beta1.Cluster
+		arg2 string
+	}{arg1, arg2})
+	stub := fake.ContainsFinalizerStub
+	fakeReturns := fake.containsFinalizerReturns
+	fake.recordInvocation("ContainsFinalizer", []interface{}{arg1, arg2})
+	fake.containsFinalizerMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeClusterClient) ContainsFinalizerCallCount() int {
+	fake.containsFinalizerMutex.RLock()
+	defer fake.containsFinalizerMutex.RUnlock()
+	return len(fake.containsFinalizerArgsForCall)
+}
+
+func (fake *FakeClusterClient) ContainsFinalizerCalls(stub func(*v1beta1.Cluster, string) bool) {
+	fake.containsFinalizerMutex.Lock()
+	defer fake.containsFinalizerMutex.Unlock()
+	fake.ContainsFinalizerStub = stub
+}
+
+func (fake *FakeClusterClient) ContainsFinalizerArgsForCall(i int) (*v1beta1.Cluster, string) {
+	fake.containsFinalizerMutex.RLock()
+	defer fake.containsFinalizerMutex.RUnlock()
+	argsForCall := fake.containsFinalizerArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeClusterClient) ContainsFinalizerReturns(result1 bool) {
+	fake.containsFinalizerMutex.Lock()
+	defer fake.containsFinalizerMutex.Unlock()
+	fake.ContainsFinalizerStub = nil
+	fake.containsFinalizerReturns = struct {
+		result1 bool
+	}{result1}
+}
+
+func (fake *FakeClusterClient) ContainsFinalizerReturnsOnCall(i int, result1 bool) {
+	fake.containsFinalizerMutex.Lock()
+	defer fake.containsFinalizerMutex.Unlock()
+	fake.ContainsFinalizerStub = nil
+	if fake.containsFinalizerReturnsOnCall == nil {
+		fake.containsFinalizerReturnsOnCall = make(map[int]struct {
+			result1 bool
+		})
+	}
+	fake.containsFinalizerReturnsOnCall[i] = struct {
+		result1 bool
 	}{result1}
 }
 
@@ -326,6 +400,8 @@ func (fake *FakeClusterClient) Invocations() map[string][][]interface{} {
 	defer fake.invocationsMutex.RUnlock()
 	fake.addFinalizerMutex.RLock()
 	defer fake.addFinalizerMutex.RUnlock()
+	fake.containsFinalizerMutex.RLock()
+	defer fake.containsFinalizerMutex.RUnlock()
 	fake.getMutex.RLock()
 	defer fake.getMutex.RUnlock()
 	fake.removeFinalizerMutex.RLock()
