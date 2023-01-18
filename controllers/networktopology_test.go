@@ -1844,7 +1844,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(k8sClient.Delete(ctx, actualCluster)).To(Succeed())
 		})
 
-		FIt("does not requeue the event", func() {
+		It("does not requeue the event", func() {
 			Expect(result.Requeue).To(BeFalse())
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
