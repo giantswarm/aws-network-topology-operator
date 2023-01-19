@@ -29,6 +29,7 @@ type ClusterClient interface {
 	Get(context.Context, types.NamespacedName) (*capi.Cluster, error)
 	AddFinalizer(context.Context, *capi.Cluster, string) error
 	RemoveFinalizer(context.Context, *capi.Cluster, string) error
+	ContainsFinalizer(*capi.Cluster, string) bool
 	UpdateStatus(ctx context.Context, cluster *capi.Cluster) error
 }
 
@@ -126,6 +127,10 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 }
 
 func (r *NetworkTopologyReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
+	if !r.client.ContainsFinalizer(cluster, FinalizerNetTop) {
+		return ctrl.Result{}, nil
+	}
+
 	for i := range r.registrars {
 		registrar := r.registrars[len(r.registrars)-1-i]
 

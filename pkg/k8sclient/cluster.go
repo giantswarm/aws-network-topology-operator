@@ -99,6 +99,11 @@ func (g *Cluster) RemoveFinalizer(ctx context.Context, capiCluster *capi.Cluster
 	return g.Client.Patch(ctx, capiCluster, client.MergeFrom(originalCluster))
 }
 
+// ContainsFinalizer checks if the given finalizer is present on the Cluster resource
+func (g *Cluster) ContainsFinalizer(capiCluster *capi.Cluster, finalizer string) bool {
+	return controllerutil.ContainsFinalizer(capiCluster, finalizer)
+}
+
 // IsManagementCluster checks if the given cluster matches the namespace/name of the management cluster provided on client creation
 func (g *Cluster) IsManagementCluster(ctx context.Context, cluster *capi.Cluster) bool {
 	return cluster.ObjectMeta.Name == g.managementCluster.Name && cluster.ObjectMeta.Namespace == g.managementCluster.Namespace

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Only send SNS message when the Transit Gateway attachment is in pending approval state.
 - Add cluster name as tag `Name` when creating the Transit Gateway attachment.
 
+### Fixed
+
+- Fix deletion when the AWSCluster is still around but the finalizer has been removed.
+
 ## [1.3.0] - 2023-01-17
 
 ### Added
