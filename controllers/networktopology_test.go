@@ -1839,7 +1839,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(clusterClient.RemoveFinalizer(ctx, actualCluster, controllers.FinalizerNetTop)).To(Succeed())
 			Expect(actualCluster.Finalizers).NotTo(ContainElement(controllers.FinalizerNetTop))
 
-			Expect(clusterClient.AddFinalizer(ctx, actualCluster, "testing")).To(Succeed())
+			Expect(clusterClient.AddFinalizer(ctx, actualCluster, "keep-cr-so-we-can-test-deletion")).To(Succeed())
 
 			Expect(k8sClient.Delete(ctx, actualCluster)).To(Succeed())
 		})
