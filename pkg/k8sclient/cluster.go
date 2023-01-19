@@ -99,6 +99,7 @@ func (g *Cluster) RemoveFinalizer(ctx context.Context, capiCluster *capi.Cluster
 	return g.Client.Patch(ctx, capiCluster, client.MergeFrom(originalCluster))
 }
 
+// ContainsFinalizer checks if the given finalizer is present on the Cluster resource
 func (g *Cluster) ContainsFinalizer(capiCluster *capi.Cluster, finalizer string) bool {
 	return controllerutil.ContainsFinalizer(capiCluster, finalizer)
 }
