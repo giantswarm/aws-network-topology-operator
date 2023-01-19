@@ -1848,6 +1848,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(result.Requeue).To(BeFalse())
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
+
+			Expect(fakeRegistrar.UnregisterCallCount()).To(Equal(0))
 		})
 
 	})
