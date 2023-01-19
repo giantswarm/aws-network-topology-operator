@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2023-01-19
+
 ### Changed
 
 - Only send SNS message when the Transit Gateway attachment is in pending approval state.
@@ -234,7 +236,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.4...v1.3.0
 [1.2.4]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.2...v1.2.3
