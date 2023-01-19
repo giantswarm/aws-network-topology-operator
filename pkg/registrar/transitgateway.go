@@ -156,8 +156,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return &TransitGatewayNotAvailableError{}
 		}
 
-		if tgwAttachment.State == types.TransitGatewayAttachmentStateInitiating || tgwAttachment.State == types.TransitGatewayAttachmentStateInitiatingRequest ||
-			tgwAttachment.State == types.TransitGatewayAttachmentStatePending || tgwAttachment.State == types.TransitGatewayAttachmentStatePendingAcceptance {
+		if tgwAttachment.State == types.TransitGatewayAttachmentStatePendingAcceptance {
 			logger.Info("Sending SNS message")
 
 			_, err = r.transitGatewayClient.PublishSNSMessage(ctx, &sns.PublishInput{

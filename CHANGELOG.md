@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Only send SNS message when the Transit Gateway attachment is in pending approval state.
+
 ## [1.3.0] - 2023-01-17
 
 ### Added
