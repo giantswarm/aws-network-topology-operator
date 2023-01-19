@@ -455,6 +455,10 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 					ResourceType: types.ResourceTypeTransitGatewayAttachment,
 					Tags: []types.Tag{
 						{
+							Key:   aws.String("Name"),
+							Value: aws.String(awsCluster.Name),
+						},
+						{
 							Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", ctx.Value(clusterNameContextKey))),
 							Value: aws.String("owned"),
 						},

@@ -502,6 +502,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
+							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
 							},
@@ -654,6 +658,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
@@ -984,6 +992,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
+							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
 							},
@@ -1093,6 +1105,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
@@ -1407,6 +1423,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
+							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
 							},
@@ -1522,6 +1542,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
