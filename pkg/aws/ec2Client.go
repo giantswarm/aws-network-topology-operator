@@ -164,3 +164,11 @@ func (e *EC2Client) GetManagedPrefixListEntries(ctx context.Context, params *ec2
 	}
 	return client.GetManagedPrefixListEntries(ctx, params, optFns...)
 }
+
+func (e *EC2Client) DescribeSubnets(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
+	client, err := e.client()
+	if err != nil {
+		return nil, err
+	}
+	return client.DescribeSubnets(ctx, params, optFns...)
+}

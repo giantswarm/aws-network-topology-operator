@@ -32,6 +32,9 @@ const (
 	// when it is referenced. We're setting the max here to 45 for now so we stay below the
 	// default "Routes per route table" quota of 50.
 	PREFIX_LIST_MAX_ENTRIES = 45
+
+	subnetTGWAttachementslabel = "subnet.giantswarm.io/tgw-attachments"
+	subnetRoleLabel            = "sigs.k8s.io/cluster-api-provider-aws/role"
 )
 
 //counterfeiter:generate . ClusterClient
@@ -409,9 +412,10 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	logger := r.getLogger(ctx)
 
 	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
-	subnets := []string{}
-	for _, s := range getPrivateSubnetsByAZ(awsCluster.Spec.NetworkSpec.Subnets) {
-		subnets = append(subnets, s[0].ID)
+	subnets, err := r.getTGWGAttachmentSubnetsOrDefault(ctx, awsCluster)
+	if err != nil {
+		logger.Error(err, "Failed to get subnets for transit gateway attachment", "transitGatewayID", gatewayID)
+		return nil, err
 	}
 
 	if vpcID == "" || len(subnets) == 0 {
@@ -769,6 +773,35 @@ func (r *TransitGateway) removeFromPrefixList(ctx context.Context, awsCluster *c
 	}
 
 	return nil
+}
+
+func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, awsCluster *capa.AWSCluster) ([]string, error) {
+	result := make([]string, 0)
+	output, err := r.transitGatewayClient.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+		Filters: []types.Filter{
+			{Name: aws.String(capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
+			{Name: aws.String(subnetTGWAttachementslabel), Values: []string{"true"}},
+			{Name: aws.String(subnetRoleLabel), Values: []string{"private"}},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(output.Subnets) == 0 {
+		for _, s := range getPrivateSubnetsByAZ(awsCluster.Spec.NetworkSpec.Subnets) {
+			result = append(result, s[0].ID)
+		}
+	}
+
+	azMap := make(map[string]bool)
+	for _, subnet := range output.Subnets {
+		if !azMap[*subnet.AvailabilityZone] {
+			result = append(result, *subnet.SubnetId)
+			azMap[*subnet.AvailabilityZone] = true
+		}
+	}
+	return result, nil
 }
 
 func getPrivateSubnetsByAZ(subnets capa.Subnets) map[string]capa.Subnets {
