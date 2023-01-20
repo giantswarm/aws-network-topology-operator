@@ -788,10 +788,11 @@ func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, 
 		return nil, err
 	}
 
-	if len(output.Subnets) == 0 {
+	if output == nil || len(output.Subnets) == 0 {
 		for _, s := range getPrivateSubnetsByAZ(awsCluster.Spec.NetworkSpec.Subnets) {
 			result = append(result, s[0].ID)
 		}
+		return result, nil
 	}
 
 	azMap := make(map[string]bool)
