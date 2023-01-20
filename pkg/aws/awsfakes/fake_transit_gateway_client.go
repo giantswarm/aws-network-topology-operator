@@ -146,7 +146,7 @@ type FakeTransitGatewayClient struct {
 		result1 *ec2.DescribeRouteTablesOutput
 		result2 error
 	}
-	DescribeSubnetsStub        func(context.Context, *ec2.DescribeSubnetsInput, ...func(*ec2.Options)) (ec2.DescribeSubnetsOutput, error)
+	DescribeSubnetsStub        func(context.Context, *ec2.DescribeSubnetsInput, ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
 	describeSubnetsMutex       sync.RWMutex
 	describeSubnetsArgsForCall []struct {
 		arg1 context.Context
@@ -154,11 +154,11 @@ type FakeTransitGatewayClient struct {
 		arg3 []func(*ec2.Options)
 	}
 	describeSubnetsReturns struct {
-		result1 ec2.DescribeSubnetsOutput
+		result1 *ec2.DescribeSubnetsOutput
 		result2 error
 	}
 	describeSubnetsReturnsOnCall map[int]struct {
-		result1 ec2.DescribeSubnetsOutput
+		result1 *ec2.DescribeSubnetsOutput
 		result2 error
 	}
 	DescribeTransitGatewayVpcAttachmentsStub        func(context.Context, *ec2.DescribeTransitGatewayVpcAttachmentsInput, ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error)
@@ -834,7 +834,7 @@ func (fake *FakeTransitGatewayClient) DescribeRouteTablesReturnsOnCall(i int, re
 	}{result1, result2}
 }
 
-func (fake *FakeTransitGatewayClient) DescribeSubnets(arg1 context.Context, arg2 *ec2.DescribeSubnetsInput, arg3 ...func(*ec2.Options)) (ec2.DescribeSubnetsOutput, error) {
+func (fake *FakeTransitGatewayClient) DescribeSubnets(arg1 context.Context, arg2 *ec2.DescribeSubnetsInput, arg3 ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
 	fake.describeSubnetsMutex.Lock()
 	ret, specificReturn := fake.describeSubnetsReturnsOnCall[len(fake.describeSubnetsArgsForCall)]
 	fake.describeSubnetsArgsForCall = append(fake.describeSubnetsArgsForCall, struct {
@@ -861,7 +861,7 @@ func (fake *FakeTransitGatewayClient) DescribeSubnetsCallCount() int {
 	return len(fake.describeSubnetsArgsForCall)
 }
 
-func (fake *FakeTransitGatewayClient) DescribeSubnetsCalls(stub func(context.Context, *ec2.DescribeSubnetsInput, ...func(*ec2.Options)) (ec2.DescribeSubnetsOutput, error)) {
+func (fake *FakeTransitGatewayClient) DescribeSubnetsCalls(stub func(context.Context, *ec2.DescribeSubnetsInput, ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)) {
 	fake.describeSubnetsMutex.Lock()
 	defer fake.describeSubnetsMutex.Unlock()
 	fake.DescribeSubnetsStub = stub
@@ -874,28 +874,28 @@ func (fake *FakeTransitGatewayClient) DescribeSubnetsArgsForCall(i int) (context
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
-func (fake *FakeTransitGatewayClient) DescribeSubnetsReturns(result1 ec2.DescribeSubnetsOutput, result2 error) {
+func (fake *FakeTransitGatewayClient) DescribeSubnetsReturns(result1 *ec2.DescribeSubnetsOutput, result2 error) {
 	fake.describeSubnetsMutex.Lock()
 	defer fake.describeSubnetsMutex.Unlock()
 	fake.DescribeSubnetsStub = nil
 	fake.describeSubnetsReturns = struct {
-		result1 ec2.DescribeSubnetsOutput
+		result1 *ec2.DescribeSubnetsOutput
 		result2 error
 	}{result1, result2}
 }
 
-func (fake *FakeTransitGatewayClient) DescribeSubnetsReturnsOnCall(i int, result1 ec2.DescribeSubnetsOutput, result2 error) {
+func (fake *FakeTransitGatewayClient) DescribeSubnetsReturnsOnCall(i int, result1 *ec2.DescribeSubnetsOutput, result2 error) {
 	fake.describeSubnetsMutex.Lock()
 	defer fake.describeSubnetsMutex.Unlock()
 	fake.DescribeSubnetsStub = nil
 	if fake.describeSubnetsReturnsOnCall == nil {
 		fake.describeSubnetsReturnsOnCall = make(map[int]struct {
-			result1 ec2.DescribeSubnetsOutput
+			result1 *ec2.DescribeSubnetsOutput
 			result2 error
 		})
 	}
 	fake.describeSubnetsReturnsOnCall[i] = struct {
-		result1 ec2.DescribeSubnetsOutput
+		result1 *ec2.DescribeSubnetsOutput
 		result2 error
 	}{result1, result2}
 }
