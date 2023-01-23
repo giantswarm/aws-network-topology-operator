@@ -779,9 +779,9 @@ func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, 
 	result := make([]string, 0)
 	output, err := r.transitGatewayClient.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
 		Filters: []types.Filter{
-			{Name: aws.String(capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
-			{Name: aws.String(subnetTGWAttachementslabel), Values: []string{"true"}},
-			{Name: aws.String(subnetRoleLabel), Values: []string{"private"}},
+			{Name: aws.String("tag:" + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
+			{Name: aws.String("tag:" + subnetTGWAttachementslabel), Values: []string{"true"}},
+			{Name: aws.String("tag:" + subnetRoleLabel), Values: []string{"private"}},
 		},
 	})
 	if err != nil {
