@@ -776,10 +776,7 @@ func (r *TransitGateway) removeFromPrefixList(ctx context.Context, awsCluster *c
 }
 
 func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, awsCluster *capa.AWSCluster) ([]string, error) {
-	logger := r.getLogger(ctx)
-
 	result := make([]string, 0)
-	logger.Info("Filter subnets according to tag for TGW attachement", "cluster", awsCluster.Name)
 	output, err := r.transitGatewayClient.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
 		Filters: []types.Filter{
 			{Name: aws.String("tag:" + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
@@ -792,13 +789,12 @@ func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, 
 	}
 
 	if output == nil || len(output.Subnets) == 0 {
-		logger.Info("could not find subnet with expected tag for TGW attachments,fallback to default behavior", "cluster", awsCluster.Name)
 		for _, s := range getPrivateSubnetsByAZ(awsCluster.Spec.NetworkSpec.Subnets) {
 			result = append(result, s[0].ID)
 		}
 		return result, nil
 	}
-	logger.Info("Found subnets with expected TGW attachment tag", "cluster", awsCluster.Name)
+
 	azMap := make(map[string]bool)
 	for _, subnet := range output.Subnets {
 		if !azMap[*subnet.AvailabilityZone] {
