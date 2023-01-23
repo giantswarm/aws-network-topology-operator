@@ -34,7 +34,7 @@ const (
 	PREFIX_LIST_MAX_ENTRIES = 45
 
 	subnetTGWAttachementslabel = "subnet.giantswarm.io/tgw-attachments"
-	subnetRoleLabel            = "sigs.k8s.io/cluster-api-provider-aws/role"
+	subnetRoleLabel            = "github.com/giantswarm/aws-vpc-operator/role"
 )
 
 //counterfeiter:generate . ClusterClient
