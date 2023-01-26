@@ -15,15 +15,16 @@ import (
 	"github.com/giantswarm/aws-network-topology-operator/tests"
 )
 
-var _ = Describe("RAM", func() {
+var _ = Describe("RAM client", func() {
 	var (
 		ctx context.Context
 
 		name string
 
-		ec2Client      *ec2.EC2
-		transitGateway *ec2.TransitGateway
-		ramClient      *aws.RAMClient
+		rawEC2Client *ec2.EC2
+		ramClient    *aws.RAMClient
+		rawRamClient *ram.RAM
+		prefixList   *ec2.ManagedPrefixList
 	)
 
 	BeforeEach(func() {
@@ -35,41 +36,40 @@ var _ = Describe("RAM", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		ec2Client = ec2.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, iamRoleARN)})
-		awsClient := ram.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, iamRoleARN)})
-		// response, err := awsClient.CreateResourceShareWithContext(ctx, &ram.CreateResourceShareInput{
-		// 	AllowExternalPrincipals: awssdk.Bool(true),
-		// 	Name:                    awssdk.String(name),
-		// 	// Principals:              aws.StringSlice(principals),
-		// 	// ResourceArns:            aws.StringSlice(resourceArns),
-		// })
-
-		output, err := ec2Client.CreateTransitGateway(&ec2.CreateTransitGatewayInput{
-			Description: awssdk.String("test transit gateway"),
+		rawEC2Client = ec2.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, iamRoleARN)})
+		rawRamClient = ram.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, iamRoleARN)})
+		ramClient = aws.NewRAMClient(rawRamClient)
+		createPrefixListOutput, err := rawEC2Client.CreateManagedPrefixList(&ec2.CreateManagedPrefixListInput{
+			AddressFamily:  awssdk.String("IPv4"),
+			MaxEntries:     awssdk.Int64(2),
+			PrefixListName: awssdk.String("topology-operator-e2e"),
 		})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(output).ToNot(BeNil())
-		transitGateway = output.TransitGateway
-		Expect(transitGateway.TransitGatewayArn).To(Equal("AAA"))
-
-		ramClient = aws.NewRAMClient(awsClient)
+		prefixList = createPrefixListOutput.PrefixList
 	})
 
 	AfterEach(func() {
-		_, err := ec2Client.DeleteTransitGateway(&ec2.DeleteTransitGatewayInput{
-			TransitGatewayId: transitGateway.TransitGatewayId,
-		})
+		_, err := rawEC2Client.DeleteManagedPrefixList(&ec2.DeleteManagedPrefixListInput{PrefixListId: prefixList.PrefixListId})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("ApplyResourceShare", func() {
-		It("creates the ", func() {
+		It("creates the share resource", func() {
 			share := aws.ResourceShare{
 				Name:              name,
-				ResourceArns:      []string{},
+				ResourceArns:      []string{*prefixList.PrefixListArn},
 				ExternalAccountID: wcAccount,
 			}
-			ramClient.ApplyResourceShare(ctx, share)
+			err := ramClient.ApplyResourceShare(ctx, share)
+			Expect(err).NotTo(HaveOccurred())
+
+			listResourcesOutput, err := rawRamClient.ListResources(&ram.ListResourcesInput{
+				Principal:     awssdk.String(wcAccount),
+				ResourceArns:  awssdk.StringSlice([]string{*prefixList.PrefixListArn}),
+				ResourceOwner: awssdk.String("SELF"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(listResourcesOutput.Resources).To(HaveLen(0))
 		})
 	})
 })
