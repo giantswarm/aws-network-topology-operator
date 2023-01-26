@@ -63,13 +63,54 @@ var _ = Describe("RAM client", func() {
 			err := ramClient.ApplyResourceShare(ctx, share)
 			Expect(err).NotTo(HaveOccurred())
 
-			listResourcesOutput, err := rawRamClient.ListResources(&ram.ListResourcesInput{
-				Principal:     awssdk.String(wcAccount),
-				ResourceArns:  awssdk.StringSlice([]string{*prefixList.PrefixListArn}),
-				ResourceOwner: awssdk.String("SELF"),
+			Eventually(func(g Gomega) []*ram.Resource {
+				listResourcesOutput, err := rawRamClient.ListResources(&ram.ListResourcesInput{
+					Principal:     awssdk.String(wcAccount),
+					ResourceArns:  awssdk.StringSlice([]string{*prefixList.PrefixListArn}),
+					ResourceOwner: awssdk.String("SELF"),
+				})
+				g.Expect(err).NotTo(HaveOccurred())
+				return listResourcesOutput.Resources
+			}).Should(HaveLen(1))
+		})
+
+		When("the resource has already been shared", func() {
+			var share aws.ResourceShare
+
+			BeforeEach(func() {
+				share = aws.ResourceShare{
+					Name:              name,
+					ResourceArns:      []string{*prefixList.PrefixListArn},
+					ExternalAccountID: wcAccount,
+				}
+				err := ramClient.ApplyResourceShare(ctx, share)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func(g Gomega) []*ram.Resource {
+					listResourcesOutput, err := rawRamClient.ListResources(&ram.ListResourcesInput{
+						Principal:     awssdk.String(wcAccount),
+						ResourceArns:  awssdk.StringSlice([]string{*prefixList.PrefixListArn}),
+						ResourceOwner: awssdk.String("SELF"),
+					})
+					g.Expect(err).NotTo(HaveOccurred())
+					return listResourcesOutput.Resources
+				}).Should(HaveLen(1))
 			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(listResourcesOutput.Resources).To(HaveLen(0))
+
+			It("does not return an error", func() {
+				err := ramClient.ApplyResourceShare(ctx, share)
+				Expect(err).NotTo(HaveOccurred())
+
+				Consistently(func(g Gomega) []*ram.Resource {
+					listResourcesOutput, err := rawRamClient.ListResources(&ram.ListResourcesInput{
+						Principal:     awssdk.String(wcAccount),
+						ResourceArns:  awssdk.StringSlice([]string{*prefixList.PrefixListArn}),
+						ResourceOwner: awssdk.String("SELF"),
+					})
+					g.Expect(err).NotTo(HaveOccurred())
+					return listResourcesOutput.Resources
+				}, "5s", "500ms").Should(HaveLen(1))
+			})
 		})
 	})
 })

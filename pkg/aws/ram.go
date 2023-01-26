@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 
+	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ram"
 )
 
@@ -21,5 +22,11 @@ func NewRAMClient(ramClient *ram.RAM) *RAMClient {
 }
 
 func (c *RAMClient) ApplyResourceShare(ctx context.Context, share ResourceShare) error {
-	return nil
+	_, err := c.ramClient.CreateResourceShare(&ram.CreateResourceShareInput{
+		AllowExternalPrincipals: awssdk.Bool(true),
+		Name:                    awssdk.String(share.Name),
+		Principals:              []*string{awssdk.String(share.ExternalAccountID)},
+		ResourceArns:            awssdk.StringSlice(share.ResourceArns),
+	})
+	return err
 }
