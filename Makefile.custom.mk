@@ -47,8 +47,7 @@ stop-localstack: docker-compose ## Run localstack with docker-compose
 
 .PHONY: test-integration
 test-integration: ginkgo start-localstack ## Run integration tests
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 8 -r -randomize-all --randomize-suites --slow-spec-threshold "30s" tests/integration/
-	$(MAKE) stop-localstack
+	AWS_ENDPOINT="http://localhost:4566" KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 8 -r -randomize-all --randomize-suites --slow-spec-threshold "30s" tests/integration/
 
 .PHONY: test-acceptance
 test-acceptance: KUBECONFIG=$(HOME)/.kube/$(CLUSTER).yml
