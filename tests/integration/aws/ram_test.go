@@ -6,6 +6,7 @@ import (
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ram"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -20,7 +21,9 @@ var _ = Describe("RAM", func() {
 
 		name string
 
-		ramClient *aws.RAMClient
+		ec2Client      *ec2.EC2
+		transitGateway *ec2.TransitGateway
+		ramClient      *aws.RAMClient
 	)
 
 	BeforeEach(func() {
@@ -28,23 +31,35 @@ var _ = Describe("RAM", func() {
 
 		name = tests.GenerateGUID("test")
 		session, err := session.NewSession(&awssdk.Config{
-			Region:   awssdk.String(region),
-			Endpoint: awssdk.String(awsEndpoint),
+			Region: awssdk.String(awsRegion),
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		awsClient := ram.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, awsIAMArn)})
-		response, err := awsClient.CreateResourceShareWithContext(ctx, &ram.CreateResourceShareInput{
-			AllowExternalPrincipals: awssdk.Bool(true),
-			Name:                    awssdk.String(name),
-			// Principals:              aws.StringSlice(principals),
-			// ResourceArns:            aws.StringSlice(resourceArns),
-		})
+		ec2Client = ec2.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, iamRoleARN)})
+		awsClient := ram.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, iamRoleARN)})
+		// response, err := awsClient.CreateResourceShareWithContext(ctx, &ram.CreateResourceShareInput{
+		// 	AllowExternalPrincipals: awssdk.Bool(true),
+		// 	Name:                    awssdk.String(name),
+		// 	// Principals:              aws.StringSlice(principals),
+		// 	// ResourceArns:            aws.StringSlice(resourceArns),
+		// })
 
+		output, err := ec2Client.CreateTransitGateway(&ec2.CreateTransitGatewayInput{
+			Description: awssdk.String("test transit gateway"),
+		})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(response).ToNot(BeNil())
+		Expect(output).ToNot(BeNil())
+		transitGateway = output.TransitGateway
+		Expect(transitGateway.TransitGatewayArn).To(Equal("AAA"))
 
 		ramClient = aws.NewRAMClient(awsClient)
+	})
+
+	AfterEach(func() {
+		_, err := ec2Client.DeleteTransitGateway(&ec2.DeleteTransitGatewayInput{
+			TransitGatewayId: transitGateway.TransitGatewayId,
+		})
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	Describe("ApplyResourceShare", func() {
@@ -52,7 +67,7 @@ var _ = Describe("RAM", func() {
 			share := aws.ResourceShare{
 				Name:              name,
 				ResourceArns:      []string{},
-				ExternalAccountID: externalAccount,
+				ExternalAccountID: wcAccount,
 			}
 			ramClient.ApplyResourceShare(ctx, share)
 		})

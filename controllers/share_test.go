@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -18,7 +19,6 @@ import (
 	"github.com/giantswarm/aws-network-topology-operator/controllers"
 	"github.com/giantswarm/aws-network-topology-operator/controllers/controllersfakes"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
-	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 	"github.com/giantswarm/aws-network-topology-operator/tests"
 )
 
@@ -49,7 +49,7 @@ var _ = FDescribe("Share", func() {
 				Name:      name,
 				Namespace: namespace,
 				Annotations: map[string]string{
-					annotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
+					gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 				},
 			},
 			Spec: capi.ClusterSpec{
@@ -121,7 +121,7 @@ var _ = FDescribe("Share", func() {
 	When("the transit gateway hasn't been created yet", func() {
 		BeforeEach(func() {
 			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[annotations.NetworkTopologyTransitGatewayIDAnnotation] = ""
+			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = ""
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -196,7 +196,7 @@ var _ = FDescribe("Share", func() {
 	When("the transit gateway arn annotation is invalid", func() {
 		BeforeEach(func() {
 			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[annotations.NetworkTopologyTransitGatewayIDAnnotation] = "not:a:valid/arn"
+			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = "not:a:valid/arn"
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
 		})
