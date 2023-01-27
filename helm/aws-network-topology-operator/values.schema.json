@@ -76,6 +76,9 @@
                 }
             }
         },
+        "serviceType": {
+            "type": "string"
+        },
         "userManaged": {
             "type": "object",
             "properties": {
