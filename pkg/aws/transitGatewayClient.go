@@ -27,6 +27,8 @@ type TransitGatewayClient interface {
 	GetManagedPrefixListEntries(ctx context.Context, params *ec2.GetManagedPrefixListEntriesInput, optFns ...func(*ec2.Options)) (*ec2.GetManagedPrefixListEntriesOutput, error)
 
 	PublishSNSMessage(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error)
+
+	DescribeSubnets(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error)
 }
 
 type TGWClient struct {
@@ -95,4 +97,9 @@ func (e *TGWClient) GetManagedPrefixListEntries(ctx context.Context, params *ec2
 
 func (e *TGWClient) PublishSNSMessage(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error) {
 	return e.snsClient.PublishSNSMessage(ctx, params, optFns...)
+}
+
+func (e *TGWClient) DescribeSubnets(ctx context.Context, params *ec2.DescribeSubnetsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
+
+	return e.ec2Client.DescribeSubnets(ctx, params, optFns...)
 }

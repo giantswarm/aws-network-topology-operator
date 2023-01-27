@@ -32,6 +32,9 @@ const (
 	// when it is referenced. We're setting the max here to 45 for now so we stay below the
 	// default "Routes per route table" quota of 50.
 	PREFIX_LIST_MAX_ENTRIES = 45
+
+	SubnetTGWAttachementsLabel = "subnet.giantswarm.io/tgw-attachments"
+	subnetRoleLabel            = "github.com/giantswarm/aws-vpc-operator/role"
 )
 
 //counterfeiter:generate . ClusterClient
@@ -409,9 +412,10 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	logger := r.getLogger(ctx)
 
 	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
-	subnets := []string{}
-	for _, s := range getPrivateSubnetsByAZ(awsCluster.Spec.NetworkSpec.Subnets) {
-		subnets = append(subnets, s[0].ID)
+	subnets, err := r.getTGWGAttachmentSubnetsOrDefault(ctx, awsCluster)
+	if err != nil {
+		logger.Error(err, "Failed to get subnets for transit gateway attachment", "transitGatewayID", gatewayID)
+		return nil, err
 	}
 
 	if vpcID == "" || len(subnets) == 0 {
@@ -771,20 +775,50 @@ func (r *TransitGateway) removeFromPrefixList(ctx context.Context, awsCluster *c
 	return nil
 }
 
-func getPrivateSubnetsByAZ(subnets capa.Subnets) map[string]capa.Subnets {
-	subnetMap := map[string]capa.Subnets{}
+// Search subnets with expected attachment, if there are not any
+// choose first one per AZ
+func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, awsCluster *capa.AWSCluster) ([]string, error) {
+	result := make([]string, 0)
+	output, err := r.transitGatewayClient.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+		Filters: []types.Filter{
+			{Name: aws.String("tag:" + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
+			{Name: aws.String("tag:" + SubnetTGWAttachementsLabel), Values: []string{"true"}},
+			{Name: aws.String("tag:" + subnetRoleLabel), Values: []string{"private"}},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
 
+	if output == nil || len(output.Subnets) == 0 {
+		result := getPrivateSubnetsByAZ(awsCluster.Spec.NetworkSpec.Subnets)
+		return result, nil
+	}
+
+	azMap := make(map[string]bool)
+	for _, subnet := range output.Subnets {
+		if !azMap[*subnet.AvailabilityZone] {
+			result = append(result, *subnet.SubnetId)
+			azMap[*subnet.AvailabilityZone] = true
+		}
+	}
+	return result, nil
+}
+
+func getPrivateSubnetsByAZ(subnets capa.Subnets) []string {
+	azMap := make(map[string]bool)
+	result := make([]string, 0)
 	for _, subnet := range subnets {
-		if !subnet.IsPublic {
-			if _, ok := subnetMap[subnet.AvailabilityZone]; !ok {
-				subnetMap[subnet.AvailabilityZone] = capa.Subnets{}
-			}
 
-			subnetMap[subnet.AvailabilityZone] = append(subnetMap[subnet.AvailabilityZone], subnet)
+		if !subnet.IsPublic {
+			if !azMap[subnet.AvailabilityZone] {
+				result = append(result, subnet.ID)
+				azMap[subnet.AvailabilityZone] = true
+			}
 		}
 	}
 
-	return subnetMap
+	return result
 }
 
 func buildEntryDescription(awsCluster *capa.AWSCluster) string {
