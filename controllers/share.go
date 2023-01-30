@@ -94,7 +94,20 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 		return ctrl.Result{}, nil
 	}
 
+	prefixListAnnotation := annotations.GetNetworkTopologyPrefixListID(cluster)
+
+	if prefixListAnnotation == "" {
+		logger.Info("prefix list arn annotation not set yet")
+		return ctrl.Result{}, nil
+	}
+
 	transitGatewayARN, err := arn.Parse(transitGatewayAnnotation)
+	if err != nil {
+		logger.Error(err, "failed to parse transit gateway arn")
+		return ctrl.Result{}, err
+	}
+
+	prefixListARN, err := arn.Parse(prefixListAnnotation)
 	if err != nil {
 		logger.Error(err, "failed to parse transit gateway arn")
 		return ctrl.Result{}, err
@@ -106,7 +119,7 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 	}
 
 	if accountID == transitGatewayARN.AccountID {
-		logger.Info("transit gateway id not set yet")
+		logger.Info("transit gateway in same account as cluster. Skipping")
 		return ctrl.Result{}, nil
 	}
 
@@ -117,8 +130,11 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 	}
 
 	err = r.ramClient.ApplyResourceShare(ctx, aws.ResourceShare{
-		Name:              getResourceShareName(cluster),
-		ResourceArns:      []string{transitGatewayARN.String()},
+		Name: getResourceShareName(cluster),
+		ResourceArns: []string{
+			transitGatewayARN.String(),
+			prefixListARN.String(),
+		},
 		ExternalAccountID: accountID,
 	})
 	if err != nil {

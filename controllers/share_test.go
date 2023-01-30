@@ -31,6 +31,7 @@ var _ = Describe("Share", func() {
 		name              string
 		sourceAccountID   = "123456789012"
 		transitGatewayARN = fmt.Sprintf("arn:aws:ec2:eu-west-2:%s:transit-gateway/tgw-01234567890abcdef", sourceAccountID)
+		prefixListARN     = fmt.Sprintf("arn:aws:ec2:eu-west-2:%s:prefix-list/pl-01234567890abcdef", sourceAccountID)
 		externalAccountID = "987654321098"
 
 		cluster         *capi.Cluster
@@ -52,6 +53,7 @@ var _ = Describe("Share", func() {
 				Namespace: namespace,
 				Annotations: map[string]string{
 					gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
+					gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
 				},
 			},
 			Spec: capi.ClusterSpec{
@@ -116,7 +118,7 @@ var _ = Describe("Share", func() {
 		Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(1))
 		_, resourceShare := ramClient.ApplyResourceShareArgsForCall(0)
 		Expect(resourceShare.Name).To(Equal(fmt.Sprintf("%s-transit-gateway", name)))
-		Expect(resourceShare.ResourceArns).To(ConsistOf(transitGatewayARN))
+		Expect(resourceShare.ResourceArns).To(ConsistOf(transitGatewayARN, prefixListARN))
 		Expect(resourceShare.ExternalAccountID).To(Equal(externalAccountID))
 	})
 
@@ -228,6 +230,24 @@ var _ = Describe("Share", func() {
 		})
 	})
 
+	When("the transit gateway hasn't been created yet", func() {
+		BeforeEach(func() {
+			patchedCluster := cluster.DeepCopy()
+			patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = ""
+			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("does not reconcile", func() {
+			result, err := reconciler.Reconcile(ctx, request)
+
+			Expect(result.Requeue).To(BeFalse())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(0))
+		})
+	})
+
 	When("the transit gateway is in the same account as the cluster", func() {
 		BeforeEach(func() {
 			patchedIdentity := clusterIdentity.DeepCopy()
@@ -246,7 +266,7 @@ var _ = Describe("Share", func() {
 		})
 	})
 
-	When("sharing the transit gateway fails", func() {
+	When("applying the resource share fails", func() {
 		BeforeEach(func() {
 			ramClient.ApplyResourceShareReturns(errors.New("boom"))
 		})
@@ -289,6 +309,20 @@ var _ = Describe("Share", func() {
 		BeforeEach(func() {
 			patchedCluster := cluster.DeepCopy()
 			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = "not:a:valid/arn"
+			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("returns an error", func() {
+			_, err := reconciler.Reconcile(ctx, request)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	When("the prefix list arn annotation is invalid", func() {
+		BeforeEach(func() {
+			patchedCluster := cluster.DeepCopy()
+			patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = "not:a:valid/arn"
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
 		})
