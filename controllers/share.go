@@ -16,9 +16,12 @@ import (
 	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 )
 
+const FinalizerResourceShare = "network-topology.finalizers.giantswarm.io/share"
+
 //counterfeiter:generate . RAMClient
 type RAMClient interface {
 	ApplyResourceShare(context.Context, aws.ResourceShare) error
+	DeleteResourceShare(context.Context, string) error
 }
 
 type ShareReconciler struct {
@@ -55,7 +58,30 @@ func (r *ShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
+	if !cluster.DeletionTimestamp.IsZero() {
+		logger.Info("Reconciling delete")
+		return r.reconcileDelete(ctx, cluster)
+	}
+
 	return r.reconcileNormal(ctx, cluster)
+}
+
+func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
+	logger := r.getLogger(ctx)
+
+	err := r.ramClient.DeleteResourceShare(ctx, getResourceShareName(cluster))
+	if err != nil {
+		logger.Error(err, "failed to apply resource share")
+		return ctrl.Result{}, err
+	}
+
+	err = r.clusterClient.RemoveFinalizer(ctx, cluster, FinalizerResourceShare)
+	if err != nil {
+		logger.Error(err, "failed to remove finalizer")
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
 }
 
 func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
@@ -84,8 +110,14 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 		return ctrl.Result{}, nil
 	}
 
+	err = r.clusterClient.AddFinalizer(ctx, cluster, FinalizerResourceShare)
+	if err != nil {
+		logger.Error(err, "failed to add finalizer")
+		return ctrl.Result{}, err
+	}
+
 	err = r.ramClient.ApplyResourceShare(ctx, aws.ResourceShare{
-		Name:              fmt.Sprintf("%s-transit-gateway", cluster.Name),
+		Name:              getResourceShareName(cluster),
 		ResourceArns:      []string{transitGatewayARN.String()},
 		ExternalAccountID: accountID,
 	})
@@ -123,4 +155,8 @@ func (r *ShareReconciler) getLogger(ctx context.Context) logr.Logger {
 	logger := log.FromContext(ctx)
 	logger = logger.WithName("share-reconciler")
 	return logger
+}
+
+func getResourceShareName(cluster *capi.Cluster) string {
+	return fmt.Sprintf("%s-transit-gateway", cluster.Name)
 }

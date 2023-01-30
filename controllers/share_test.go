@@ -9,12 +9,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/giantswarm/aws-network-topology-operator/controllers"
 	"github.com/giantswarm/aws-network-topology-operator/controllers/controllersfakes"
@@ -116,6 +118,96 @@ var _ = Describe("Share", func() {
 		Expect(resourceShare.Name).To(Equal(fmt.Sprintf("%s-transit-gateway", name)))
 		Expect(resourceShare.ResourceArns).To(ConsistOf(transitGatewayARN))
 		Expect(resourceShare.ExternalAccountID).To(Equal(externalAccountID))
+	})
+
+	It("adds a finalizer", func() {
+		result, err := reconciler.Reconcile(ctx, request)
+		Expect(result.Requeue).To(BeFalse())
+		Expect(err).NotTo(HaveOccurred())
+
+		actualCluster := &capa.AWSCluster{}
+		err = k8sClient.Get(ctx, types.NamespacedName{Name: awsCluster.Name, Namespace: awsCluster.Namespace}, actualCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(actualCluster.Finalizers).To(ContainElement(controllers.FinalizerResourceShare))
+	})
+
+	When("adding the finalizer fails", func() {
+		BeforeEach(func() {
+			fakeClusterClient := new(controllersfakes.FakeClusterClient)
+			fakeClusterClient.GetReturns(cluster, nil)
+			fakeClusterClient.GetAWSClusterRoleIdentityReturns(clusterIdentity, nil)
+			fakeClusterClient.AddFinalizerReturns(errors.New("boom"))
+			reconciler = controllers.NewShareReconciler(fakeClusterClient, ramClient)
+		})
+
+		It("returns an error", func() {
+			_, err := reconciler.Reconcile(ctx, request)
+			Expect(err).To(MatchError(ContainSubstring("boom")))
+		})
+	})
+
+	When("the cluster has been deleted", func() {
+		BeforeEach(func() {
+			patchedCluster := cluster.DeepCopy()
+			controllerutil.AddFinalizer(patchedCluster, controllers.FinalizerResourceShare)
+			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+			Expect(err).NotTo(HaveOccurred())
+			err = k8sClient.Delete(ctx, patchedCluster)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("deletes the resource share", func() {
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(result.Requeue).To(BeFalse())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(ramClient.DeleteResourceShareCallCount()).To(Equal(1))
+			_, actualName := ramClient.DeleteResourceShareArgsForCall(0)
+			Expect(actualName).To(Equal(fmt.Sprintf("%s-transit-gateway", name)))
+		})
+
+		It("removes the finalizer", func() {
+			result, err := reconciler.Reconcile(ctx, request)
+			Expect(result.Requeue).To(BeFalse())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, k8sclient.GetNamespacedName(cluster), &capi.Cluster{})
+			Expect(k8serrors.IsNotFound(err)).To(BeTrue())
+		})
+
+		When("deleting the resource share fails", func() {
+			BeforeEach(func() {
+				ramClient.DeleteResourceShareReturns(errors.New("boom"))
+			})
+
+			It("retuns an error", func() {
+				_, err := reconciler.Reconcile(ctx, request)
+				Expect(err).To(MatchError(ContainSubstring("boom")))
+
+				actualCluster := &capi.Cluster{}
+				err = k8sClient.Get(ctx, k8sclient.GetNamespacedName(cluster), actualCluster)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(actualCluster.Finalizers).To(ContainElement(controllers.FinalizerResourceShare))
+			})
+		})
+
+		When("removing the finalizer fails", func() {
+			BeforeEach(func() {
+				now := metav1.Now()
+				cluster.DeletionTimestamp = &now
+				fakeClusterClient := new(controllersfakes.FakeClusterClient)
+				fakeClusterClient.GetReturns(cluster, nil)
+				fakeClusterClient.RemoveFinalizerReturns(errors.New("boom"))
+				reconciler = controllers.NewShareReconciler(fakeClusterClient, ramClient)
+			})
+
+			It("returns an error", func() {
+				_, err := reconciler.Reconcile(ctx, request)
+				Expect(err).To(MatchError(ContainSubstring("boom")))
+			})
+		})
 	})
 
 	When("the transit gateway hasn't been created yet", func() {
