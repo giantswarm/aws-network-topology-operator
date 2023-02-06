@@ -2,6 +2,7 @@ package aws_test
 
 import (
 	"context"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
@@ -41,6 +42,9 @@ var _ = Describe("RAM client", func() {
 	}
 
 	BeforeEach(func() {
+		SetDefaultEventuallyTimeout(5 * time.Second)
+		SetDefaultConsistentlyPollingInterval(100 * time.Millisecond)
+
 		ctx = log.IntoContext(context.Background(), logger)
 		name = tests.GenerateGUID("test")
 
@@ -48,24 +52,19 @@ var _ = Describe("RAM client", func() {
 			Region: awssdk.String(awsRegion),
 		})
 		Expect(err).NotTo(HaveOccurred())
-		rawEC2Client = ec2.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, mcIAMRoleARN)})
-		rawRamClient = ram.New(session, &awssdk.Config{Credentials: stscreds.NewCredentials(session, mcIAMRoleARN)})
 
-		createPrefixListOutput, err := rawEC2Client.CreateManagedPrefixList(&ec2.CreateManagedPrefixListInput{
-			AddressFamily:  awssdk.String("IPv4"),
-			MaxEntries:     awssdk.Int64(2),
-			PrefixListName: awssdk.String(name),
-		})
-		Expect(err).NotTo(HaveOccurred())
-		prefixList = createPrefixListOutput.PrefixList
-		Eventually(func() string {
-			prefixListOutput, err := rawEC2Client.DescribeManagedPrefixLists(&ec2.DescribeManagedPrefixListsInput{
-				PrefixListIds: []*string{prefixList.PrefixListId},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(prefixListOutput.PrefixLists).To(HaveLen(1))
-			return *prefixListOutput.PrefixLists[0].State
-		}).Should(Equal("create-complete"))
+		rawEC2Client = ec2.New(session,
+			&awssdk.Config{
+				Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
+			},
+		)
+		rawRamClient = ram.New(session,
+			&awssdk.Config{
+				Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
+			},
+		)
+
+		prefixList = createManagedPrefixList(rawEC2Client, name)
 
 		share = aws.ResourceShare{
 			Name:              name,
@@ -117,7 +116,7 @@ var _ = Describe("RAM client", func() {
 				err := ramClient.ApplyResourceShare(ctx, share)
 				Expect(err).NotTo(HaveOccurred())
 
-				Consistently(getSharedResources, "1s", "500ms").Should(HaveLen(1))
+				Consistently(getSharedResources).Should(HaveLen(1))
 			})
 		})
 
@@ -155,6 +154,40 @@ var _ = Describe("RAM client", func() {
 			It("returns an error", func() {
 				err := ramClient.ApplyResourceShare(ctx, share)
 				Expect(err).To(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("DeleteResourceShare", func() {
+		BeforeEach(func() {
+			share := aws.ResourceShare{
+				Name:              name,
+				ResourceArns:      []string{*prefixList.PrefixListArn},
+				ExternalAccountID: wcAccount,
+			}
+			err := ramClient.ApplyResourceShare(ctx, share)
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(getSharedResources).Should(HaveLen(1))
+		})
+
+		It("deletes the resource share", func() {
+			err := ramClient.DeleteResourceShare(ctx, name)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(getSharedResources).Should(HaveLen(0))
+		})
+
+		When("the resource is already deleted", func() {
+			BeforeEach(func() {
+				err := ramClient.DeleteResourceShare(ctx, name)
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(getSharedResources).Should(HaveLen(0))
+			})
+
+			It("does not return an error", func() {
+				err := ramClient.DeleteResourceShare(ctx, name)
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 	})

@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
@@ -28,7 +29,8 @@ func NewRAMClient(ramClient *ram.RAM) *RAMClient {
 }
 
 func (c *RAMClient) ApplyResourceShare(ctx context.Context, share ResourceShare) error {
-	logger := c.getLogger(ctx, share)
+	logger := c.getLogger(ctx)
+	logger = logger.WithValues("resource-share-name", share.Name, "resource-arns", share.ResourceArns)
 
 	resourceShare, err := c.ramClient.GetResourceShares(&ram.GetResourceSharesInput{
 		Name:          aws.String(share.Name),
@@ -60,9 +62,57 @@ func (c *RAMClient) ApplyResourceShare(ctx context.Context, share ResourceShare)
 	return nil
 }
 
-func (c *RAMClient) getLogger(ctx context.Context, share ResourceShare) logr.Logger {
+func (c *RAMClient) DeleteResourceShare(ctx context.Context, name string) error {
+	logger := c.getLogger(ctx)
+	logger = logger.WithValues("resource-share-name", name)
+
+	resourceShare, err := c.getResourceShare(ctx, name)
+	if err != nil {
+		logger.Error(err, "failed to get resource share")
+		return err
+	}
+
+	if resourceShare == nil {
+		logger.Info("resource share not found")
+		return nil
+	}
+
+	_, err = c.ramClient.DeleteResourceShare(&ram.DeleteResourceShareInput{
+		ResourceShareArn: resourceShare.ResourceShareArn,
+	})
+	return err
+}
+
+func (c *RAMClient) getResourceShare(ctx context.Context, name string) (*ram.ResourceShare, error) {
+	logger := c.getLogger(ctx)
+	logger = logger.WithValues("resource-share-name", name)
+
+	resourceShare, err := c.ramClient.GetResourceShares(&ram.GetResourceSharesInput{
+		Name:          aws.String(name),
+		ResourceOwner: aws.String(ResourceOwnerSelf),
+	})
+	if err != nil {
+		logger.Error(err, "failed to get resource share")
+		return nil, errors.WithStack(err)
+	}
+
+	resourceShareCount := len(resourceShare.ResourceShares)
+
+	if resourceShareCount == 0 {
+		logger.Info("no resource shares found")
+		return nil, nil
+	}
+
+	if len(resourceShare.ResourceShares) > 1 {
+		logger.Info("wrong number of resource shares", "resource-shares-found", len(resourceShare.ResourceShares))
+		return nil, fmt.Errorf("expected 1 resource share, found %d", resourceShareCount)
+	}
+
+	return resourceShare.ResourceShares[0], nil
+}
+
+func (c *RAMClient) getLogger(ctx context.Context) logr.Logger {
 	logger := log.FromContext(ctx)
 	logger = logger.WithName("ram-client")
-	logger = logger.WithValues("resource-share-name", share.Name, "resource-arns", share.ResourceArns)
 	return logger
 }
