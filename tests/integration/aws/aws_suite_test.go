@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -47,3 +49,23 @@ var _ = BeforeSuite(func() {
 	mcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", mcAccount, iamRoleId)
 	wcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", wcAccount, iamRoleId)
 })
+
+func createManagedPrefixList(ec2Client *ec2.EC2, name string) *ec2.ManagedPrefixList {
+	createPrefixListOutput, err := ec2Client.CreateManagedPrefixList(&ec2.CreateManagedPrefixListInput{
+		AddressFamily:  awssdk.String("IPv4"),
+		MaxEntries:     awssdk.Int64(2),
+		PrefixListName: awssdk.String(name),
+	})
+	Expect(err).NotTo(HaveOccurred())
+	prefixList := createPrefixListOutput.PrefixList
+	Eventually(func() string {
+		prefixListOutput, err := ec2Client.DescribeManagedPrefixLists(&ec2.DescribeManagedPrefixListsInput{
+			PrefixListIds: []*string{prefixList.PrefixListId},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(prefixListOutput.PrefixLists).To(HaveLen(1))
+		return *prefixListOutput.PrefixLists[0].State
+	}).Should(Equal("create-complete"))
+
+	return prefixList
+}
