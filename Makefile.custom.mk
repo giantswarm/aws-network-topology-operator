@@ -10,8 +10,7 @@ IMAGE_TAG = $(word 2,$(subst :, ,$(IMG)))
 CLUSTER ?= acceptance
 MANAGEMENT_CLUSTER_NAME ?= test-mc
 MANAGEMENT_CLUSTER_NAMESPACE ?= test
-
-
+ 
 ##@ Development
 
 .PHONY: ensure-deploy-envs
@@ -153,9 +152,7 @@ goimports: ## Download kind locally if necessary.
 CLUSTERCTL = $(shell pwd)/bin/clusterctl
 .PHONY: clusterctl
 clusterctl: ## Download clusterctl locally if necessary.
-	$(eval LATEST_RELEASE = $(shell curl -s https://api.github.com/repos/kubernetes-sigs/cluster-api/releases/latest | jq -r '.tag_name'))
-	curl -sL "https://github.com/kubernetes-sigs/cluster-api/releases/download/$(LATEST_RELEASE)/clusterctl-linux-amd64" -o $(CLUSTERCTL)
-	chmod +x $(CLUSTERCTL)
+	$(call go-get-tool,$(CLUSTERCTL),sigs.k8s.io/cluster-api/cmd/clusterctl@latest)
 
 DOCKER_COMPOSE = $(shell pwd)/bin/docker-compose
 .PHONY: docker-compose
