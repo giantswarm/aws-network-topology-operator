@@ -2,6 +2,7 @@ package acceptance_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -20,8 +21,11 @@ import (
 var (
 	k8sClient client.Client
 
-	namespace    string
-	namespaceObj *corev1.Namespace
+	namespace         string
+	namespaceObj      *corev1.Namespace
+	mcIAMRoleARN      string
+	awsRegion         string
+	externalAccountID string
 )
 
 func TestAcceptance(t *testing.T) {
@@ -43,6 +47,15 @@ var _ = BeforeSuite(func() {
 
 	k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
+
+	mcAccount := tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
+	//	wcAccount = tests.GetEnvOrSkip("WC_AWS_ACCOUNT")
+	iamRoleId := tests.GetEnvOrSkip("AWS_IAM_ROLE_ID")
+	awsRegion = tests.GetEnvOrSkip("AWS_REGION")
+
+	mcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", mcAccount, iamRoleId)
+	// wcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", wcAccount, iamRoleId)
+	externalAccountID = tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
 })
 
 var _ = BeforeEach(func() {
