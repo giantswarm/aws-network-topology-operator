@@ -23,6 +23,7 @@ aws:
   secretAccessKey: secretkey
   region: region
 
+serviceType: "managed"
 userManaged:
   # snsTopic defins the SNS topic to send TGW attatchment requests to when running in UserManaged mode.
   snsTopic: ""
