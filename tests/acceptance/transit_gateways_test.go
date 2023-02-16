@@ -8,18 +8,21 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
-	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
-	"github.com/giantswarm/aws-network-topology-operator/tests"
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/giantswarm/aws-network-topology-operator/controllers"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
+	"github.com/giantswarm/aws-network-topology-operator/tests"
 )
 
 var _ = Describe("Transit Gateways", func() {
@@ -36,7 +39,7 @@ var _ = Describe("Transit Gateways", func() {
 
 	BeforeEach(func() {
 		SetDefaultEventuallyPollingInterval(time.Second)
-		SetDefaultEventuallyTimeout(time.Second * 90)
+		SetDefaultEventuallyTimeout(3 * time.Minute)
 		ctx = context.Background()
 		name = tests.GenerateGUID("test")
 
@@ -71,7 +74,7 @@ var _ = Describe("Transit Gateways", func() {
 					APIVersion: capa.GroupVersion.String(),
 					Kind:       "AWSCluster",
 					Namespace:  "test",
-					Name:       name,
+					Name:       "test-mc",
 				},
 			},
 		}
@@ -109,6 +112,26 @@ var _ = Describe("Transit Gateways", func() {
 	AfterEach(func() {
 		err := k8sClient.Delete(ctx, managementCluster)
 		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func(g Gomega) []string {
+			err := k8sClient.Get(ctx, k8sclient.GetNamespacedName(managementCluster), managementCluster)
+			if k8serrors.IsNotFound(err) {
+				return nil
+			}
+			g.Expect(err).NotTo(HaveOccurred())
+			return managementCluster.Finalizers
+		}).ShouldNot(ContainElement(controllers.FinalizerNetTop))
+
+		err = k8sClient.Delete(ctx, managementAWSCluster)
+		if !k8serrors.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		err = k8sClient.Delete(ctx, clusterIdentity)
+		if !k8serrors.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
 		controllerutil.RemoveFinalizer(managementCluster, capa.ClusterFinalizer)
 		patchHelper, err := patch.NewHelper(managementCluster, k8sClient)
 		Expect(err).NotTo(HaveOccurred())
