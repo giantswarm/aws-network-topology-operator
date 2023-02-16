@@ -278,6 +278,9 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 	gatewayID := annotations.GetNetworkTopologyTransitGatewayID(cluster)
 
 	switch val := annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation); val {
+	case "":
+		fallthrough
+
 	case annotation.NetworkTopologyModeNone:
 		logger.Info("Mode currently not handled", "mode", annotation.NetworkTopologyModeNone)
 
