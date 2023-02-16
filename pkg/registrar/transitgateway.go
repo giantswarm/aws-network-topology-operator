@@ -33,7 +33,7 @@ const (
 	// default "Routes per route table" quota of 50.
 	PREFIX_LIST_MAX_ENTRIES = 45
 
-	SubnetTGWAttachementsLabel = "subnet.giantswarm.io/tgw-attachments"
+	SubnetTGWAttachementsLabel = "subnet.giantswarm.io/tgw"
 	subnetRoleLabel            = "github.com/giantswarm/aws-vpc-operator/role"
 )
 
