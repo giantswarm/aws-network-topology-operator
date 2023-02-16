@@ -318,6 +318,10 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 			return err
 		}
 
+		if err := r.deleteTransitGateway(ctx, &gatewayID, cluster); err != nil {
+			return err
+		}
+
 	default:
 		err := fmt.Errorf("invalid NetworkTopologyMode value")
 		logger.Error(err, "Unexpected NetworkTopologyMode annotation value found on cluster", "value", val)
@@ -480,10 +484,39 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	return nil, nil
 }
 
+func (r *TransitGateway) deleteTransitGateway(ctx context.Context, gatewayID *string, cluster *capi.Cluster) error {
+	logger := r.getLogger(ctx)
+	logger = logger.WithValues("transitGatewayID", gatewayID)
+
+	logger.Info("Deleting transit gateway")
+	defer logger.Info("Done deleting transit gateway")
+
+	if !r.clusterClient.IsManagementCluster(ctx, cluster) {
+		logger.Info("Cluster is a workload cluster. Skipping transit gateway deletion")
+		return nil
+	}
+
+	describeTGWattachmentInput := &ec2.DeleteTransitGatewayInput{
+		TransitGatewayId: gatewayID,
+	}
+
+	_, err := r.transitGatewayClient.DeleteTransitGateway(ctx, describeTGWattachmentInput)
+	if err != nil {
+		logger.Error(err, "failed to delete transit gateway")
+		return err
+	}
+
+	return nil
+}
+
 func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *string, awsCluster *capa.AWSCluster) error {
 	logger := r.getLogger(ctx)
 
 	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
+	if vpcID == "" {
+		logger.Info("VPC already deleted. Skipping removing transit gateway attachments")
+		return nil
+	}
 
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
 		Filters: []types.Filter{
@@ -499,8 +532,8 @@ func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *st
 	}
 
 	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
-		Name:      awsCluster.ObjectMeta.Name,
-		Namespace: awsCluster.ObjectMeta.Namespace,
+		Name:      awsCluster.Name,
+		Namespace: awsCluster.Namespace,
 	})
 
 	attachments, err := transitGatewayAttachmentClient.DescribeTransitGatewayVpcAttachments(ctx, describeTGWattachmentInput)

@@ -60,7 +60,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		reconcileErr error
 	)
 
-	var newCluster = func(name, namespace string, annotations map[string]string, vpcID string) (*capi.Cluster, *capa.AWSCluster) {
+	newCluster := func(name, namespace string, annotations map[string]string, vpcID string) (*capi.Cluster, *capa.AWSCluster) {
 		awsCluster := &capa.AWSCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        name,
@@ -251,7 +251,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 	When("the cluster doesn't have the topology mode annotation", func() {
 		BeforeEach(func() {
-
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
 				[]controllers.Registrar{
@@ -512,7 +511,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			It("should create routes on subnet route tables", func() {
 				Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
 			})
-
 		})
 
 		When("the cluster is a Workload Cluster", func() {
@@ -635,7 +633,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			It("should create routes on subnet route tables", func() {
 				Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
 			})
-
 		})
 
 		When("the TGW attachment is active", func() {
@@ -732,9 +729,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			It("should create routes on subnet route tables", func() {
 				Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
 			})
-
 		})
-
 	})
 
 	When("the cluster topology mode annotation is set to 'GiantSwarmManaged'", func() {
@@ -809,7 +804,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		})
 
 		When("the cluster is a Management Cluster", func() {
-
 			When("the cluster is new", func() {
 				BeforeEach(func() {
 					mcCluster, mcAWSCluster := newCluster(
@@ -1234,9 +1228,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(k8sClient.Delete(ctx, mcCluster)).To(Succeed())
 				})
 
-				It("detach the transit gateway attachment but not the management cluster's transit gateway", func() {
+				It("detach the transit gateway attachment and deletes the transit gateway", func() {
 					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
-					Expect(transitGatewayClient.DeleteTransitGatewayCallCount()).To(Equal(0))
+					Expect(transitGatewayClient.DeleteTransitGatewayCallCount()).To(Equal(1))
 
 					// Management vs. workload cluster AWS account
 					Expect(transitGatewayClient.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
@@ -1358,7 +1352,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					}))
 					Expect(*payload.VpcId).To(Equal(wcVPCId))
 				})
-
 			})
 
 			When("the cluster has an existing transit gateway but no attachment", func() {
@@ -1630,7 +1623,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(reconcileErr.Error()).To(ContainSubstring("management cluster doesn't have a TGW specified"))
 					Expect(result.Requeue).To(BeTrue())
 				})
-
 			})
 
 			When("the a transit gateway matching the ID doesn't exist", func() {
