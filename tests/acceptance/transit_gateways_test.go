@@ -24,10 +24,10 @@ import (
 
 var _ = Describe("Transit Gateways", func() {
 	var (
-		ctx     context.Context
-		fixture *acceptance.Fixture
-
-		rawEC2Client *ec2.EC2
+		ctx              context.Context
+		fixture          *acceptance.Fixture
+		transitGatewayID string
+		rawEC2Client     *ec2.EC2
 	)
 
 	BeforeEach(func() {
@@ -88,7 +88,6 @@ var _ = Describe("Transit Gateways", func() {
 	})
 
 	It("creates the transit gateway", func() {
-		var transitGatewayID string
 		getAnnotation := func() string {
 			cluster := &capi.Cluster{}
 			err := k8sClient.Get(ctx, fixture.GetManagementClusterNamespacedName(), cluster)
@@ -104,5 +103,22 @@ var _ = Describe("Transit Gateways", func() {
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(output).NotTo(BeNil())
+	})
+	It("attaches the transit gateway to private subnet with expected tags", func() {
+		describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("transit-gateway-id"),
+					Values: []*string{aws.String(transitGatewayID)},
+				},
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{aws.String(fixture.GetVpcID())},
+				},
+			},
+		}
+		describeTGWattachmentOutput, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(describeTGWattachmentOutput.TransitGatewayVpcAttachments).NotTo(HaveLen(0))
 	})
 })

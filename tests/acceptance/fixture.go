@@ -41,9 +41,32 @@ func (f *Fixture) GetManagementAWSCluster() *capa.AWSCluster {
 func (f *Fixture) GetClusterRoleIdentity() *capa.AWSClusterRoleIdentity {
 	return f.clusterRoleIdentity
 }
+func (f *Fixture) GetVpcID() string {
+	return f.vpcId
+}
 
 func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2, mcIAMRoleARN, awsRegion, availabilityZone string) error {
 	name := tests.GenerateGUID("test")
+
+	createVpcOutput, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
+		CidrBlock: aws.String("172.64.0.0/16"),
+	})
+	if err != nil {
+		return fmt.Errorf("error while creating vpc: %w", err)
+	}
+
+	f.vpcId = *createVpcOutput.Vpc.VpcId
+
+	createSubnetOutput, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
+		CidrBlock:         aws.String("172.64.0.0/20"),
+		VpcId:             aws.String(f.vpcId),
+		AvailabilityZone:  &availabilityZone,
+		TagSpecifications: generateTagSpecifications(),
+	})
+	if err != nil {
+		return fmt.Errorf("error while creating subnet: %w", err)
+	}
+	f.subnetId = *createSubnetOutput.Subnet.SubnetId
 
 	f.clusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 		ObjectMeta: metav1.ObjectMeta{
@@ -60,7 +83,7 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 		},
 	}
 
-	err := k8sClient.Create(ctx, f.clusterRoleIdentity)
+	err = k8sClient.Create(ctx, f.clusterRoleIdentity)
 	if err != nil {
 		return fmt.Errorf("error while creating AWSClusterRoleIdentity: %w", err)
 	}
@@ -92,6 +115,12 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 				Name: name,
 				Kind: capa.ClusterRoleIdentityKind,
 			},
+			NetworkSpec: capa.NetworkSpec{
+				VPC: capa.VPCSpec{
+					ID:        f.vpcId,
+					CidrBlock: "172.64.0.0/16",
+				},
+			},
 		},
 	}
 
@@ -104,24 +133,6 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 	if err != nil {
 		return fmt.Errorf("error while creating AWSCluster: %w", err)
 	}
-
-	createVpcOutput, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock: aws.String("172.64.0.0/16"),
-	})
-	if err != nil {
-		return fmt.Errorf("error while creating vpc: %w", err)
-	}
-
-	f.vpcId = *createVpcOutput.Vpc.VpcId
-	createSubnetOutput, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
-		CidrBlock:        aws.String("172.64.0.0/20"),
-		VpcId:            createVpcOutput.Vpc.VpcId,
-		AvailabilityZone: &availabilityZone,
-	})
-	if err != nil {
-		return fmt.Errorf("error while creating subnet: %w", err)
-	}
-	f.subnetId = *createSubnetOutput.Subnet.SubnetId
 
 	return nil
 }
@@ -172,4 +183,28 @@ func (f *Fixture) Teardown(ctx context.Context, k8sClient client.Client, rawEC2C
 	}
 
 	return nil
+}
+
+func generateTagSpecifications() []*ec2.TagSpecification {
+	tagSpec := &ec2.TagSpecification{
+		ResourceType: aws.String(ec2.ResourceTypeSubnet),
+		Tags: []*ec2.Tag{
+			&ec2.Tag{
+				Key:   aws.String("subnet.giantswarm.io/tgw-attachments"),
+				Value: aws.String("true"),
+			},
+			&ec2.Tag{
+				Key:   aws.String("github.com/giantswarm/aws-vpc-operator/role"),
+				Value: aws.String("private"),
+			},
+			&ec2.Tag{
+				Key:   aws.String(capa.NameKubernetesAWSCloudProviderPrefix + "test-mc"),
+				Value: aws.String("shared"),
+			},
+		},
+	}
+
+	tagSpecifications := make([]*ec2.TagSpecification, 0)
+	tagSpecifications = append(tagSpecifications, tagSpec)
+	return tagSpecifications
 }
