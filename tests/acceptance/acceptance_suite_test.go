@@ -26,6 +26,7 @@ var (
 	mcIAMRoleARN      string
 	awsRegion         string
 	externalAccountID string
+	availabilityZone  string
 )
 
 func TestAcceptance(t *testing.T) {
@@ -52,7 +53,7 @@ var _ = BeforeSuite(func() {
 	//	wcAccount = tests.GetEnvOrSkip("WC_AWS_ACCOUNT")
 	iamRoleId := tests.GetEnvOrSkip("AWS_IAM_ROLE_ID")
 	awsRegion = tests.GetEnvOrSkip("AWS_REGION")
-
+	availabilityZone = fmt.Sprintf("%sa", awsRegion)
 	mcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", mcAccount, iamRoleId)
 	// wcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", wcAccount, iamRoleId)
 	externalAccountID = tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
