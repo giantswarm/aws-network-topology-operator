@@ -482,34 +482,65 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				}
 			})
 
-			It("should not create a new transit gateway", func() {
-				Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
-			})
-
-			It("should create a transit gateway attachment", func() {
-				// Management vs. workload cluster AWS account
-				Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
-				Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
-
-				_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
-				Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-					ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
-					Tags: []awstypes.Tag{
-						{
-							Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
-							Value: aws.String("owned"),
+			When("the transit gateway attachment does not exist yet", func() {
+				BeforeEach(func() {
+					transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(&ec2.CreateTransitGatewayVpcAttachmentOutput{
+						TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+							State:      awstypes.TransitGatewayAttachmentStateInitiating,
+							VpcOwnerId: aws.String(wcVPCId),
 						},
-					},
-				}))
-				Expect(*payload.VpcId).To(Equal(mcVPCId))
+					}, nil)
+				})
+				It("should create a transit gateway attachment", func() {
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+
+					_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
+						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
+							{
+								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
+								Value: aws.String("owned"),
+							},
+						},
+					}))
+					Expect(*payload.VpcId).To(Equal(mcVPCId))
+				})
+
+				It("should create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
+				})
+
+				It("should not send the SNS message", func() {
+					Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(0))
+				})
 			})
 
-			It("should send the SNS message", func() {
-				Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(1))
-			})
+			When("the transit gateway attachment already exists and it's pending approval", func() {
+				BeforeEach(func() {
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+							{
+								State:      awstypes.TransitGatewayAttachmentStatePendingAcceptance,
+								VpcOwnerId: aws.String(wcVPCId),
+							},
+						},
+					}, nil)
+				})
+				It("should not create the transit gateway attachment again", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				})
 
-			It("should create routes on subnet route tables", func() {
-				Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
+				It("should send the SNS message", func() {
+					Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(1))
+				})
 			})
 		})
 
@@ -608,30 +639,65 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
 			})
 
-			It("should create a transit gateway attachment", func() {
-				// Management vs. workload cluster AWS account
-				Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
-				Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
-
-				_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
-				Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
-					ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
-					Tags: []awstypes.Tag{
-						{
-							Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
-							Value: aws.String("owned"),
+			When("the transit gateway attachment does not exist yet", func() {
+				BeforeEach(func() {
+					transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentReturns(&ec2.CreateTransitGatewayVpcAttachmentOutput{
+						TransitGatewayVpcAttachment: &awstypes.TransitGatewayVpcAttachment{
+							State:      awstypes.TransitGatewayAttachmentStateInitiating,
+							VpcOwnerId: aws.String(wcVPCId),
 						},
-					},
-				}))
-				Expect(*payload.VpcId).To(Equal(wcVPCId))
+					}, nil)
+				})
+				It("should create a transit gateway attachment", func() {
+					// Management vs. workload cluster AWS account
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(1))
+
+					_, payload, _ := transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentArgsForCall(0)
+					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
+						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
+						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
+							{
+								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
+								Value: aws.String("owned"),
+							},
+						},
+					}))
+					Expect(*payload.VpcId).To(Equal(wcVPCId))
+				})
+
+				It("should create routes on subnet route tables", func() {
+					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
+				})
+
+				It("should not send the SNS message", func() {
+					Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(0))
+				})
 			})
 
-			It("should send the SNS message", func() {
-				Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(1))
-			})
+			When("the transit gateway attachment already exists and it's pending approval", func() {
+				BeforeEach(func() {
+					transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
+						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{
+							{
+								State:      awstypes.TransitGatewayAttachmentStatePendingAcceptance,
+								VpcOwnerId: aws.String(wcVPCId),
+							},
+						},
+					}, nil)
+				})
+				It("should not create the transit gateway attachment again", func() {
+					Expect(transitGatewayClient.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
+				})
 
-			It("should create routes on subnet route tables", func() {
-				Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
+				It("should send the SNS message", func() {
+					Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(1))
+				})
 			})
 		})
 
@@ -922,6 +988,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
+							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
 							},
@@ -1031,6 +1101,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
@@ -1345,6 +1419,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
 							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
+							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
 							},
@@ -1459,6 +1537,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(payload.TagSpecifications).To(ContainElement(awstypes.TagSpecification{
 						ResourceType: awstypes.ResourceTypeTransitGatewayAttachment,
 						Tags: []awstypes.Tag{
+							{
+								Key:   aws.String("Name"),
+								Value: aws.String(request.Name),
+							},
 							{
 								Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", request.Name)),
 								Value: aws.String("owned"),
@@ -1820,5 +1902,29 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(result.RequeueAfter).To(BeZero())
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
+	})
+
+	When("the cluster is deleted and doesn't have our network topology finalizer", func() {
+		BeforeEach(func() {
+			actualCluster := &capi.Cluster{}
+			err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(clusterClient.RemoveFinalizer(ctx, actualCluster, controllers.FinalizerNetTop)).To(Succeed())
+			Expect(actualCluster.Finalizers).NotTo(ContainElement(controllers.FinalizerNetTop))
+
+			Expect(clusterClient.AddFinalizer(ctx, actualCluster, "keep-cr-so-we-can-test-deletion")).To(Succeed())
+
+			Expect(k8sClient.Delete(ctx, actualCluster)).To(Succeed())
+		})
+
+		It("does not requeue the event", func() {
+			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(BeZero())
+			Expect(reconcileErr).NotTo(HaveOccurred())
+
+			Expect(fakeRegistrar.UnregisterCallCount()).To(Equal(0))
+		})
+
 	})
 })

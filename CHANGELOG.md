@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2023-02-16
+
+### Fixed
+
+- Use short tag name for TGW attachment subnets.
+
+## [1.4.1] - 2023-01-27
+
+### Changed
+
+- Change subnet selection condition for transit gateway attachment.
+- Add default vaulue for `serviceType`.
+
+## [1.4.0] - 2023-01-19
+
+### Changed
+
+- Only send SNS message when the Transit Gateway attachment is in pending approval state.
+- Add cluster name as tag `Name` when creating the Transit Gateway attachment.
+
+### Fixed
+
+- Fix deletion when the AWSCluster is still around but the finalizer has been removed.
+
 ## [1.3.0] - 2023-01-17
 
 ### Added
@@ -225,7 +249,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.1...v1.4.2
+[1.4.1]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.4...v1.3.0
 [1.2.4]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.2.2...v1.2.3
