@@ -34,7 +34,7 @@ const (
 	PREFIX_LIST_MAX_ENTRIES = 45
 
 	SubnetTGWAttachementsLabel = "subnet.giantswarm.io/tgw"
-	subnetRoleLabel            = "github.com/giantswarm/aws-vpc-operator/role"
+	SubnetRoleLabel            = "github.com/giantswarm/aws-vpc-operator/role"
 )
 
 //counterfeiter:generate . ClusterClient
@@ -819,7 +819,7 @@ func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, 
 		Filters: []types.Filter{
 			{Name: aws.String("tag:" + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
 			{Name: aws.String("tag:" + SubnetTGWAttachementsLabel), Values: []string{"true"}},
-			{Name: aws.String("tag:" + subnetRoleLabel), Values: []string{"private"}},
+			{Name: aws.String("tag:" + SubnetRoleLabel), Values: []string{"private"}},
 		},
 	})
 	if err != nil {
