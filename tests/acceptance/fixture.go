@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/registrar"
 	"github.com/giantswarm/aws-network-topology-operator/tests"
 )
 
@@ -32,6 +33,10 @@ func (f *Fixture) GetManagementClusterNamespacedName() types.NamespacedName {
 
 func (f *Fixture) GetManagementCluster() *capi.Cluster {
 	return f.managementCluster
+}
+
+func (f *Fixture) GetManagementAWSClusterNamespacedName() types.NamespacedName {
+	return k8sclient.GetNamespacedName(f.managementAWSCluster)
 }
 
 func (f *Fixture) GetManagementAWSCluster() *capa.AWSCluster {
@@ -120,6 +125,13 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 					ID:        f.vpcId,
 					CidrBlock: "172.64.0.0/16",
 				},
+				Subnets: []capa.SubnetSpec{
+					{
+						CidrBlock: "172.64.0.0/20",
+						ID:        f.subnetId,
+						IsPublic:  false,
+					},
+				},
 			},
 		},
 	}
@@ -190,11 +202,11 @@ func generateTagSpecifications() []*ec2.TagSpecification {
 		ResourceType: aws.String(ec2.ResourceTypeSubnet),
 		Tags: []*ec2.Tag{
 			&ec2.Tag{
-				Key:   aws.String("subnet.giantswarm.io/tgw-attachments"),
+				Key:   aws.String(registrar.SubnetTGWAttachementsLabel),
 				Value: aws.String("true"),
 			},
 			&ec2.Tag{
-				Key:   aws.String("github.com/giantswarm/aws-vpc-operator/role"),
+				Key:   aws.String(registrar.SubnetRoleLabel),
 				Value: aws.String("private"),
 			},
 			&ec2.Tag{

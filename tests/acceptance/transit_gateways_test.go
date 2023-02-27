@@ -2,6 +2,7 @@ package acceptance_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -27,13 +28,14 @@ var _ = Describe("Transit Gateways", func() {
 		ctx              context.Context
 		fixture          *acceptance.Fixture
 		transitGatewayID string
+		prefixListID     string
 		rawEC2Client     *ec2.EC2
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 		SetDefaultEventuallyPollingInterval(time.Second)
-		SetDefaultEventuallyTimeout(3 * time.Minute)
+		SetDefaultEventuallyTimeout(5 * time.Minute)
 		session, err := session.NewSession(&aws.Config{
 			Region: aws.String(awsRegion),
 		})
@@ -103,22 +105,84 @@ var _ = Describe("Transit Gateways", func() {
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(output).NotTo(BeNil())
-	})
-	It("attaches the transit gateway to private subnet with expected tags", func() {
-		describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
-			Filters: []*ec2.Filter{
-				{
-					Name:   aws.String("transit-gateway-id"),
-					Values: []*string{aws.String(transitGatewayID)},
+
+		getTGWAttachments := func() []*ec2.TransitGatewayVpcAttachment {
+			describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
+				Filters: []*ec2.Filter{
+					{
+						Name:   aws.String("transit-gateway-id"),
+						Values: []*string{aws.String(transitGatewayID)},
+					},
+					{
+						Name:   aws.String("vpc-id"),
+						Values: []*string{aws.String(fixture.GetVpcID())},
+					},
 				},
-				{
-					Name:   aws.String("vpc-id"),
-					Values: []*string{aws.String(fixture.GetVpcID())},
-				},
-			},
+			}
+			describeTGWattachmentOutput, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+			Expect(err).NotTo(HaveOccurred())
+			return describeTGWattachmentOutput.TransitGatewayVpcAttachments
 		}
-		describeTGWattachmentOutput, err := rawEC2Client.DescribeTransitGatewayVpcAttachments(describeTGWattachmentInput)
+		Eventually(getTGWAttachments).ShouldNot(HaveLen(0))
+
+		getPrefixlistIDAnnotation := func() string {
+			cluster := &capi.Cluster{}
+			err := k8sClient.Get(ctx, fixture.GetManagementClusterNamespacedName(), cluster)
+			Expect(err).NotTo(HaveOccurred())
+			prefixListID = annotations.GetNetworkTopologyPrefixListID(cluster)
+			return prefixListID
+		}
+		Eventually(getPrefixlistIDAnnotation).ShouldNot(BeEmpty())
+
+		result, err := rawEC2Client.GetManagedPrefixListEntries(&ec2.GetManagedPrefixListEntriesInput{
+			PrefixListId: aws.String(prefixListID),
+			MaxResults:   aws.Int64(100),
+		})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(describeTGWattachmentOutput.TransitGatewayVpcAttachments).NotTo(HaveLen(0))
+
+		prefixListDescription := fmt.Sprintf("CIDR block for cluster %s", fixture.GetManagementAWSCluster().ObjectMeta.Name)
+		descriptionFound := false
+		for _, entry := range result.Entries {
+			if *entry.Cidr == fixture.GetManagementAWSCluster().Spec.NetworkSpec.VPC.CidrBlock {
+				if *entry.Description == prefixListDescription {
+					descriptionFound = true
+				}
+				break
+			}
+		}
+		Expect(descriptionFound).To(BeTrue())
+		checkRouteTables := func() bool {
+			subnets := []*string{}
+			for _, s := range fixture.GetManagementAWSCluster().Spec.NetworkSpec.Subnets {
+				subnets = append(subnets, aws.String(s.ID))
+			}
+
+			routeTablesOutput, err := rawEC2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
+				Filters: []*ec2.Filter{
+					{Name: aws.String("association.subnet-id"), Values: subnets},
+				},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			matchFound := true
+			if output != nil && len(routeTablesOutput.RouteTables) > 0 {
+				for _, rt := range routeTablesOutput.RouteTables {
+					matchFound = false
+					for _, route := range rt.Routes {
+						if route.DestinationPrefixListId != nil && route.TransitGatewayId != nil {
+							fmt.Printf("prefixListID %s transitGatewayID %s\n", *route.DestinationPrefixListId, *route.TransitGatewayId)
+							if *route.DestinationPrefixListId == prefixListID && *route.TransitGatewayId == transitGatewayID {
+								// route already exists
+								matchFound = true
+							}
+						}
+					}
+					if matchFound {
+						continue
+					}
+				}
+			}
+			return matchFound
+		}
+		Eventually(checkRouteTables).Should(BeTrue())
 	})
 })
