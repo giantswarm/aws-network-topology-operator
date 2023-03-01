@@ -28,6 +28,9 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	awsSdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ram"
 	gocache "github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -109,9 +112,11 @@ func main() {
 		Namespace: managementClusterNamespace,
 	}
 	client := k8sclient.NewCluster(mgr.GetClient(), managementCluster)
+	session := session.Must(session.NewSession())
 
 	ec2Service := aws.NewEC2Client(ctx, client, managementCluster)
 	snsService := aws.NewSNSClient(ctx, snsTopic, client, managementCluster)
+	ramService := aws.NewRAMClient(ram.New(session, awsSdk.NewConfig()))
 
 	// Cache EC2 clients to avoid lots of credential requests due to client recreation
 	expiration := 5 * time.Minute
@@ -143,6 +148,12 @@ func main() {
 	}
 	controller := controllers.NewNetworkTopologyReconciler(client, registrars)
 	err = controller.SetupWithManager(mgr)
+	if err != nil {
+		setupLog.Error(err, "failed to setup controller", "controller", "Cluster")
+		os.Exit(1)
+	}
+	shareController := controllers.NewShareReconciler(client, ramService)
+	err = shareController.SetupWithManager(mgr)
 	if err != nil {
 		setupLog.Error(err, "failed to setup controller", "controller", "Cluster")
 		os.Exit(1)
