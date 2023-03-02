@@ -12,9 +12,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/giantswarm/k8smetadata/pkg/annotation"
+
 	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
-	"github.com/giantswarm/k8smetadata/pkg/annotation"
 )
 
 const FinalizerResourceShare = "network-topology.finalizers.giantswarm.io/share"
