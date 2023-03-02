@@ -33,6 +33,7 @@ var _ = Describe("Share", func() {
 		transitGatewayARN = fmt.Sprintf("arn:aws:ec2:eu-west-2:%s:transit-gateway/tgw-01234567890abcdef", sourceAccountID)
 		prefixListARN     = fmt.Sprintf("arn:aws:ec2:eu-west-2:%s:prefix-list/pl-01234567890abcdef", sourceAccountID)
 		externalAccountID = "987654321098"
+		notValidArn       = "not:a:valid/arn"
 
 		cluster         *capi.Cluster
 		clusterIdentity *capa.AWSClusterRoleIdentity
@@ -309,7 +310,7 @@ var _ = Describe("Share", func() {
 	When("the transit gateway arn annotation is invalid", func() {
 		BeforeEach(func() {
 			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = "not:a:valid/arn"
+			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = notValidArn
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -323,7 +324,7 @@ var _ = Describe("Share", func() {
 	When("the prefix list arn annotation is invalid", func() {
 		BeforeEach(func() {
 			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = "not:a:valid/arn"
+			patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = notValidArn
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -372,7 +373,7 @@ var _ = Describe("Share", func() {
 	When("the AWSClusterRoleIdentity ARN is invalid", func() {
 		BeforeEach(func() {
 			patchedIdentity := clusterIdentity.DeepCopy()
-			patchedIdentity.Spec.RoleArn = "not:a:valid/arn"
+			patchedIdentity.Spec.RoleArn = notValidArn
 			err := k8sClient.Patch(context.Background(), patchedIdentity, client.MergeFrom(clusterIdentity))
 			Expect(err).NotTo(HaveOccurred())
 		})
