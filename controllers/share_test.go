@@ -54,6 +54,7 @@ var _ = Describe("Share", func() {
 				Annotations: map[string]string{
 					gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 					gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
+					gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
 				},
 			},
 			Spec: capi.ClusterSpec{
