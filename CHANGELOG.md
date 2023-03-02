@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add acceptance tests.
+- Add transit gateway share reconciler.
+
 ## [1.4.4] - 2023-03-15
 
 ### Changed
