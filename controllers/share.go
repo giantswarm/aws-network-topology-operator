@@ -14,6 +14,7 @@ import (
 
 	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
+	"github.com/giantswarm/k8smetadata/pkg/annotation"
 )
 
 const FinalizerResourceShare = "network-topology.finalizers.giantswarm.io/share"
@@ -86,6 +87,11 @@ func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capi.Clu
 
 func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
 	logger := r.getLogger(ctx)
+
+	if annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation) != annotation.NetworkTopologyModeGiantSwarmManaged {
+		logger.Info("Network topology mode is not set to GiantSwarmManaged, skipping sharing operation")
+		return ctrl.Result{}, nil
+	}
 
 	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGatewayID(cluster)
 

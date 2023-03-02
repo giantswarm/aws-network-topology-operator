@@ -150,36 +150,6 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 }
 
 func (f *Fixture) Teardown(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2) error {
-	/*	err := k8sClient.Delete(ctx, f.managementCluster)
-		if err != nil {
-			return err
-		}
-
-		err = k8sClient.Delete(ctx, f.managementAWSCluster)
-		if !k8serrors.IsNotFound(err) {
-			if err != nil {
-				return err
-			}
-		}
-
-		err = k8sClient.Delete(ctx, f.clusterRoleIdentity)
-		if !k8serrors.IsNotFound(err) {
-			if err != nil {
-				return err
-			}
-		}
-
-		controllerutil.RemoveFinalizer(f.managementCluster, capa.ClusterFinalizer)
-		patchHelper, err := patch.NewHelper(f.managementCluster, k8sClient)
-		if err != nil {
-			return err
-		}
-
-		err = patchHelper.Patch(ctx, f.managementCluster)
-		if err != nil {
-			return err
-		}*/
-
 	_, err := rawEC2Client.DeleteSubnet(&ec2.DeleteSubnetInput{
 		SubnetId: aws.String(f.subnetId),
 	})
@@ -201,15 +171,15 @@ func generateTagSpecifications() []*ec2.TagSpecification {
 	tagSpec := &ec2.TagSpecification{
 		ResourceType: aws.String(ec2.ResourceTypeSubnet),
 		Tags: []*ec2.Tag{
-			&ec2.Tag{
+			{
 				Key:   aws.String(registrar.SubnetTGWAttachementsLabel),
 				Value: aws.String("true"),
 			},
-			&ec2.Tag{
+			{
 				Key:   aws.String(registrar.SubnetRoleLabel),
 				Value: aws.String("private"),
 			},
-			&ec2.Tag{
+			{
 				Key:   aws.String(capa.NameKubernetesAWSCloudProviderPrefix + "test-mc"),
 				Value: aws.String("shared"),
 			},
