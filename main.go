@@ -37,6 +37,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -115,13 +116,12 @@ func main() {
 	ec2Service := aws.NewEC2Client(ctx, client, managementCluster)
 	snsService := aws.NewSNSClient(ctx, snsTopic, client, managementCluster)
 
-	identity, err := client.GetAWSClusterRoleIdentity(ctx, managementCluster)
+	identity, err := getAwsClusterRoleIdentity(managementCluster)
 	if err != nil {
-		setupLog.Error(err, "unable to get management cluster's AWS Cluster Role Identity")
+		setupLog.Error(err, "unable to get AWS Cluster Role Identity for management cluster")
 		os.Exit(1)
 	}
-
-	ramService := aws.NewRAMClient(aws.AwsRamClientFromClusterRoleIdentity(session, identity.Spec.RoleArn, identity.Spec.ExternalID))
+	ramService := aws.NewRAMClient(aws.AwsRamClientFromARN(session, identity.Spec.RoleArn, identity.Spec.ExternalID))
 
 	// Cache EC2 clients to avoid lots of credential requests due to client recreation
 	expiration := 5 * time.Minute
@@ -180,4 +180,30 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func getAwsClusterRoleIdentity(managementCluster types.NamespacedName) (*capa.AWSClusterRoleIdentity, error) {
+	ctx := context.Background()
+	identity := &capa.AWSClusterRoleIdentity{}
+	cluster := &capa.AWSCluster{}
+
+	clientConfig, err := ctrl.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	ctrlClient, err := ctrlclient.New(clientConfig, ctrlclient.Options{Scheme: scheme})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ctrlClient.Get(ctx, managementCluster, cluster); err != nil {
+		return nil, err
+	}
+
+	err = ctrlClient.Get(ctx, types.NamespacedName{Name: cluster.Spec.IdentityRef.Name}, identity)
+	if err != nil {
+		return nil, err
+	}
+	return identity, nil
 }

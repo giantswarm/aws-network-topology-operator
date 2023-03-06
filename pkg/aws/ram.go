@@ -119,7 +119,7 @@ func (c *RAMClient) getLogger(ctx context.Context) logr.Logger {
 	return logger
 }
 
-func AwsRamClientFromClusterRoleIdentity(sess *session.Session, roleARN, externalID string) *ram.RAM {
+func AwsRamClientFromARN(sess *session.Session, roleARN, externalID string) *ram.RAM {
 	return ram.New(sess, &awssdk.Config{Credentials: stscreds.NewCredentials(sess, roleARN, configureExternalId(roleARN, externalID))})
 }
 

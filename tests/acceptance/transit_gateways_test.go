@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gstruct"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -151,7 +152,7 @@ var _ = Describe("Transit Gateways", func() {
 			}
 		}
 		Expect(descriptionFound).To(BeTrue())
-		checkRouteTables := func() bool {
+		checkRouteTables := func() []*ec2.RouteTable {
 			subnets := []*string{}
 			for _, s := range fixture.GetManagementAWSCluster().Spec.NetworkSpec.Subnets {
 				subnets = append(subnets, aws.String(s.ID))
@@ -163,26 +164,16 @@ var _ = Describe("Transit Gateways", func() {
 				},
 			})
 			Expect(err).NotTo(HaveOccurred())
-			matchFound := true
-			if output != nil && len(routeTablesOutput.RouteTables) > 0 {
-				for _, rt := range routeTablesOutput.RouteTables {
-					matchFound = false
-					for _, route := range rt.Routes {
-						if route.DestinationPrefixListId != nil && route.TransitGatewayId != nil {
-							fmt.Printf("prefixListID %s transitGatewayID %s\n", *route.DestinationPrefixListId, *route.TransitGatewayId)
-							if *route.DestinationPrefixListId == prefixListID && *route.TransitGatewayId == transitGatewayID {
-								// route already exists
-								matchFound = true
-							}
-						}
-					}
-					if matchFound {
-						continue
-					}
-				}
-			}
-			return matchFound
+			Expect(routeTablesOutput).NotTo(BeNil())
+			Expect(routeTablesOutput.RouteTables).NotTo(HaveLen(0))
+
+			return routeTablesOutput.RouteTables
 		}
-		Eventually(checkRouteTables).Should(BeTrue())
+		Eventually(checkRouteTables).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
+			"Routes": ContainElement(MatchFields(IgnoreExtras, Fields{
+				"DestinationPrefixListId": Equal(prefixListID),
+				"TransitGatewayId":        Equal(transitGatewayID),
+			})),
+		})))
 	})
 })
