@@ -6,6 +6,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -88,8 +90,8 @@ func (c *RAMClient) getResourceShare(ctx context.Context, name string) (*ram.Res
 	logger = logger.WithValues("resource-share-name", name)
 
 	resourceShare, err := c.ramClient.GetResourceShares(&ram.GetResourceSharesInput{
-		Name:          aws.String(name),
-		ResourceOwner: aws.String(ResourceOwnerSelf),
+		Name:          awssdk.String(name),
+		ResourceOwner: awssdk.String(ResourceOwnerSelf),
 	})
 	if err != nil {
 		logger.Error(err, "failed to get resource share")
@@ -115,4 +117,19 @@ func (c *RAMClient) getLogger(ctx context.Context) logr.Logger {
 	logger := log.FromContext(ctx)
 	logger = logger.WithName("ram-client")
 	return logger
+}
+
+func AwsRamClientFromClusterRoleIdentity(sess *session.Session, roleARN, externalID string) *ram.RAM {
+	return ram.New(sess, &awssdk.Config{Credentials: stscreds.NewCredentials(sess, roleARN, configureExternalId(roleARN, externalID))})
+}
+
+func configureExternalId(roleArn, externalId string) func(provider *stscreds.AssumeRoleProvider) {
+	return func(assumeRoleProvider *stscreds.AssumeRoleProvider) {
+		if roleArn != "" {
+			assumeRoleProvider.RoleARN = roleArn
+		}
+		if externalId != "" {
+			assumeRoleProvider.ExternalID = awssdk.String(externalId)
+		}
+	}
 }

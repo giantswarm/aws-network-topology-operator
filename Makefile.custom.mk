@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/giantswarm/aws-network-topology-operator:dev
+IMG ?= docker.io/giantswarm/aws-network-topology-operator:dev
 
 # Substitute colon with space - this creates a list.
 # Word selects the n-th element of the list
