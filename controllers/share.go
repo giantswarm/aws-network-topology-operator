@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
@@ -57,7 +58,12 @@ func (r *ShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}
 	if err != nil {
 		logger.Error(err, "failed to get cluster")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation) != annotation.NetworkTopologyModeGiantSwarmManaged {
+		logger.Info("Network topology mode is not set to GiantSwarmManaged, skipping sharing operation")
+		return ctrl.Result{}, nil
 	}
 
 	if !cluster.DeletionTimestamp.IsZero() {
@@ -88,11 +94,6 @@ func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capi.Clu
 
 func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
 	logger := r.getLogger(ctx)
-
-	if annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation) != annotation.NetworkTopologyModeGiantSwarmManaged {
-		logger.Info("Network topology mode is not set to GiantSwarmManaged, skipping sharing operation")
-		return ctrl.Result{}, nil
-	}
 
 	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGatewayID(cluster)
 
@@ -126,7 +127,7 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 	}
 
 	if accountID == transitGatewayARN.AccountID {
-		logger.Info("transit gateway in same account as cluster. Skipping")
+		logger.Info("transit gateway in same account as cluster, there is no need to share it using ram. Skipping")
 		return ctrl.Result{}, nil
 	}
 
