@@ -95,7 +95,7 @@ func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capi.Clu
 func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
 	logger := r.getLogger(ctx)
 
-	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGatewayID(cluster)
+	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(cluster)
 
 	if transitGatewayAnnotation == "" {
 		logger.Info("transit gateway arn annotation not set yet")

@@ -3,12 +3,14 @@ package registrar
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -64,7 +66,10 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 	ctx = context.WithValue(ctx, clusterNameContextKey, cluster.ObjectMeta.Name)
 	logger := r.getLogger(ctx)
 
-	gatewayID := annotations.GetNetworkTopologyTransitGatewayID(cluster)
+	gatewayID, err := getTransitGatewayID(logger, cluster)
+	if err != nil {
+		return err
+	}
 
 	switch val := annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation); val {
 	case "":
@@ -112,7 +117,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 					return err
 				}
 
-				gatewayID = annotations.GetNetworkTopologyTransitGatewayID(mc)
+				gatewayID = annotations.GetNetworkTopologyTransitGateway(mc)
 				if gatewayID == "" {
 					err = fmt.Errorf("management cluster doesn't have a TGW specified")
 					logger.Error(err, "The Management Cluster doesn't have a Transit Gateway ID specified")
@@ -133,7 +138,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 
 		// Ensure TGW ID is saved back to the current cluster
 		baseCluster := cluster.DeepCopy()
-		annotations.SetNetworkTopologyTransitGatewayID(cluster, *tgw.TransitGatewayId)
+		annotations.SetNetworkTopologyTransitGateway(cluster, *tgw.TransitGatewayArn)
 		if cluster, err = r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
 			logger.Error(err, "Failed to patch cluster resource with TGW ID")
 			return err
@@ -200,7 +205,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 					return err
 				}
 
-				gatewayID = annotations.GetNetworkTopologyTransitGatewayID(mc)
+				gatewayID = annotations.GetNetworkTopologyTransitGateway(mc)
 				if gatewayID == "" {
 					err = fmt.Errorf("management cluster doesn't have a TGW specified")
 					logger.Error(err, "The Management Cluster doesn't have a Transit Gateway ID specified")
@@ -221,7 +226,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 
 		// Ensure TGW ID is saved back to the current cluster
 		baseCluster := cluster.DeepCopy()
-		annotations.SetNetworkTopologyTransitGatewayID(cluster, *tgw.TransitGatewayId)
+		annotations.SetNetworkTopologyTransitGateway(cluster, *tgw.TransitGatewayArn)
 		if cluster, err = r.clusterClient.Patch(ctx, cluster, client.MergeFrom(baseCluster)); err != nil {
 			logger.Error(err, "Failed to patch cluster resource with TGW ID")
 			return err
@@ -275,7 +280,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) error {
 	logger := r.getLogger(ctx)
 
-	gatewayID := annotations.GetNetworkTopologyTransitGatewayID(cluster)
+	gatewayID := annotations.GetNetworkTopologyTransitGateway(cluster)
 
 	switch val := annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation); val {
 	case "":
@@ -870,4 +875,21 @@ func getPrivateSubnetsByAZ(subnets capa.Subnets) []string {
 
 func buildEntryDescription(awsCluster *capa.AWSCluster) string {
 	return fmt.Sprintf("CIDR block for cluster %s", awsCluster.ObjectMeta.Name)
+}
+
+func getTransitGatewayID(logger logr.Logger, cluster *capi.Cluster) (string, error) {
+	gatewayARNAnnotation := annotations.GetNetworkTopologyTransitGateway(cluster)
+	if gatewayARNAnnotation == "" {
+		return "", nil
+	}
+
+	gatewayARN, err := arn.Parse(gatewayARNAnnotation)
+	if err != nil {
+		logger.Error(err, "Failed to parse transit gateway ARN")
+		return "", err
+	}
+
+	// The ARN struct holds the resource in the format "<resource-type>/<resource-name>"
+	resourceSplit := strings.Split(gatewayARN.Resource, "/")
+	return resourceSplit[1], nil
 }

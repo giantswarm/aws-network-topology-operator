@@ -95,7 +95,7 @@ var _ = Describe("Transit Gateways", func() {
 			cluster := &capi.Cluster{}
 			err := k8sClient.Get(ctx, fixture.GetManagementClusterNamespacedName(), cluster)
 			Expect(err).NotTo(HaveOccurred())
-			transitGatewayID = annotations.GetNetworkTopologyTransitGatewayID(cluster)
+			transitGatewayID = annotations.GetNetworkTopologyTransitGateway(cluster)
 			return transitGatewayID
 		}
 

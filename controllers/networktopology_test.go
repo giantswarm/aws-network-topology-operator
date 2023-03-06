@@ -44,10 +44,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		transitGatewayClient                   *awsfakes.FakeTransitGatewayClient
 		transitGatewayClientForWorkloadCluster *awsfakes.FakeTransitGatewayClient
 
-		transitGatewayID = "abc-123"
-		prefixListID     = "prefix-123"
-		mcVPCId          = "vpc-123"
-		wcVPCId          = "vpc-987"
+		transitGatewayID  = "abc-123"
+		transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateway/%s", transitGatewayID)
+		prefixListID      = "prefix-123"
+		mcVPCId           = "vpc-123"
+		wcVPCId           = "vpc-987"
 
 		cluster    *capi.Cluster
 		awsCluster *capa.AWSCluster
@@ -205,7 +206,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Name:      mc.Name,
 					Namespace: mc.Namespace,
 					Annotations: map[string]string{
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 					},
 				},
 				Spec: capi.ClusterSpec{
@@ -342,7 +343,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				&ec2.DescribeTransitGatewaysOutput{
 					TransitGateways: []awstypes.TransitGateway{
 						{
-							TransitGatewayId: &transitGatewayID,
+							TransitGatewayArn: &transitGatewayARN,
+							TransitGatewayId:  &transitGatewayID,
 						},
 					},
 				},
@@ -373,7 +375,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			patchedCluster.Finalizers = []string{controllers.FinalizerNetTop}
 			patchedCluster.Annotations = map[string]string{
 				gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-				gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+				gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 				gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 			}
 			Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
@@ -392,7 +394,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(actualMode).To(Equal(gsannotation.NetworkTopologyModeUserManaged))
 
 			actualID := actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]
-			Expect(actualID).To(Equal(transitGatewayID))
+			Expect(actualID).To(Equal(transitGatewayARN))
 		})
 
 		It("does requeue the event", func() {
@@ -407,7 +409,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
@@ -419,8 +421,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					&ec2.DescribeTransitGatewaysOutput{
 						TransitGateways: []awstypes.TransitGateway{
 							{
-								TransitGatewayId: &transitGatewayID,
-								State:            awstypes.TransitGatewayStateAvailable,
+								TransitGatewayArn: &transitGatewayARN,
+								TransitGatewayId:  &transitGatewayID,
+								State:             awstypes.TransitGatewayStateAvailable,
 							},
 						},
 					},
@@ -549,7 +552,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					wcVPCId,
@@ -559,7 +562,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
@@ -571,8 +574,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					&ec2.DescribeTransitGatewaysOutput{
 						TransitGateways: []awstypes.TransitGateway{
 							{
-								TransitGatewayId: &transitGatewayID,
-								State:            awstypes.TransitGatewayStateAvailable,
+								TransitGatewayArn: &transitGatewayARN,
+								TransitGatewayId:  &transitGatewayID,
+								State:             awstypes.TransitGatewayStateAvailable,
 							},
 						},
 					},
@@ -705,7 +709,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
@@ -717,8 +721,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					&ec2.DescribeTransitGatewaysOutput{
 						TransitGateways: []awstypes.TransitGateway{
 							{
-								TransitGatewayId: &transitGatewayID,
-								State:            awstypes.TransitGatewayStateAvailable,
+								TransitGatewayArn: &transitGatewayARN,
+								TransitGatewayId:  &transitGatewayID,
+								State:             awstypes.TransitGatewayStateAvailable,
 							},
 						},
 					},
@@ -803,7 +808,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				&ec2.DescribeTransitGatewaysOutput{
 					TransitGateways: []awstypes.TransitGateway{
 						{
-							TransitGatewayId: &transitGatewayID,
+							TransitGatewayArn: &transitGatewayARN,
+							TransitGatewayId:  &transitGatewayID,
 						},
 					},
 				},
@@ -857,7 +863,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			actualID := actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]
-			Expect(actualID).To(Equal(transitGatewayID))
+			Expect(actualID).To(Equal(transitGatewayARN))
 		})
 
 		It("does requeue the event", func() {
@@ -889,8 +895,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.CreateTransitGatewayReturns(
 						&ec2.CreateTransitGatewayOutput{
 							TransitGateway: &awstypes.TransitGateway{
-								TransitGatewayId: &transitGatewayID,
-								State:            awstypes.TransitGatewayStateAvailable,
+								TransitGatewayArn: &transitGatewayARN,
+								TransitGatewayId:  &transitGatewayID,
+								State:             awstypes.TransitGatewayStateAvailable,
 							},
 						},
 						nil,
@@ -1008,7 +1015,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1019,8 +1026,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1122,7 +1130,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1133,8 +1141,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1220,7 +1229,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1231,8 +1240,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1325,7 +1335,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1336,8 +1346,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1435,7 +1446,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						wcVPCId,
 					)
@@ -1444,7 +1455,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1455,8 +1466,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1554,7 +1566,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						wcVPCId,
 					)
@@ -1563,7 +1575,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1574,8 +1586,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1710,7 +1723,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: "not-exist",
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						wcVPCId,
 					)
@@ -1779,7 +1792,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1790,8 +1803,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1922,6 +1936,5 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 			Expect(fakeRegistrar.UnregisterCallCount()).To(Equal(0))
 		})
-
 	})
 })
