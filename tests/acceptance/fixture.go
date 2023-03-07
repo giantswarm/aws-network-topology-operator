@@ -20,9 +20,11 @@ import (
 )
 
 type Fixture struct {
+	associtationID       string
 	managementCluster    *capi.Cluster
 	managementAWSCluster *capa.AWSCluster
 	clusterRoleIdentity  *capa.AWSClusterRoleIdentity
+	routeTableId         string
 	subnetId             string
 	vpcId                string
 }
@@ -72,6 +74,23 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 		return fmt.Errorf("error while creating subnet: %w", err)
 	}
 	f.subnetId = *createSubnetOutput.Subnet.SubnetId
+
+	createRouteTableOutput, err := rawEC2Client.CreateRouteTable(&ec2.CreateRouteTableInput{
+		VpcId: aws.String(f.vpcId),
+	})
+	if err != nil {
+		return fmt.Errorf("error while creating route table: %w", err)
+	}
+	f.routeTableId = *createRouteTableOutput.RouteTable.RouteTableId
+
+	assocRouteTableOutput, err := rawEC2Client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
+		RouteTableId: aws.String(f.routeTableId),
+		SubnetId:     aws.String(f.subnetId),
+	})
+	if err != nil {
+		return fmt.Errorf("error while associating route table with subnet: %w", err)
+	}
+	f.associtationID = *assocRouteTableOutput.AssociationId
 
 	f.clusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 		ObjectMeta: metav1.ObjectMeta{
@@ -150,7 +169,21 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 }
 
 func (f *Fixture) Teardown(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2) error {
-	_, err := rawEC2Client.DeleteSubnet(&ec2.DeleteSubnetInput{
+	_, err := rawEC2Client.DisassociateRouteTable(&ec2.DisassociateRouteTableInput{
+		AssociationId: &f.associtationID,
+	})
+	if err != nil {
+		return fmt.Errorf("error while disassociating route table with subnet: %w", err)
+	}
+
+	_, err = rawEC2Client.DeleteRouteTable(&ec2.DeleteRouteTableInput{
+		RouteTableId: &f.routeTableId,
+	})
+	if err != nil {
+		return fmt.Errorf("error while deleting route table : %w", err)
+	}
+
+	_, err = rawEC2Client.DeleteSubnet(&ec2.DeleteSubnetInput{
 		SubnetId: aws.String(f.subnetId),
 	})
 	if err != nil {
