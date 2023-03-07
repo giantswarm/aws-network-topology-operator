@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
+	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/giantswarm/aws-network-topology-operator/controllers"
+	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/k8sclient"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 	"github.com/giantswarm/aws-network-topology-operator/tests/acceptance"
@@ -26,24 +27,23 @@ import (
 
 var _ = Describe("Transit Gateways", func() {
 	var (
-		ctx              context.Context
-		fixture          *acceptance.Fixture
-		transitGatewayID string
-		prefixListID     string
-		rawEC2Client     *ec2.EC2
+		ctx          context.Context
+		fixture      *acceptance.Fixture
+		prefixListID string
+		rawEC2Client *ec2.EC2
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 		SetDefaultEventuallyPollingInterval(time.Second)
 		SetDefaultEventuallyTimeout(5 * time.Minute)
-		session, err := session.NewSession(&aws.Config{
-			Region: aws.String(awsRegion),
+		session, err := session.NewSession(&awssdk.Config{
+			Region: awssdk.String(awsRegion),
 		})
 		Expect(err).NotTo(HaveOccurred())
 
 		rawEC2Client = ec2.New(session,
-			&aws.Config{
+			&awssdk.Config{
 				Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
 			},
 		)
@@ -91,17 +91,23 @@ var _ = Describe("Transit Gateways", func() {
 	})
 
 	It("creates the transit gateway", func() {
-		getAnnotation := func() string {
+		var transitGatewayID string
+		getTransitGatewayID := func(g Gomega) string {
 			cluster := &capi.Cluster{}
 			err := k8sClient.Get(ctx, fixture.GetManagementClusterNamespacedName(), cluster)
-			Expect(err).NotTo(HaveOccurred())
-			transitGatewayID = annotations.GetNetworkTopologyTransitGateway(cluster)
+			g.Expect(err).NotTo(HaveOccurred())
+			transitGatewayARN := annotations.GetNetworkTopologyTransitGateway(cluster)
+			if transitGatewayARN == "" {
+				return ""
+			}
+			transitGatewayID, err = aws.GetARNResourceID(transitGatewayARN)
+			g.Expect(err).NotTo(HaveOccurred())
 			return transitGatewayID
 		}
 
-		Eventually(getAnnotation).ShouldNot(BeEmpty())
+		Eventually(getTransitGatewayID).ShouldNot(BeEmpty())
 		output, err := rawEC2Client.DescribeTransitGateways(&ec2.DescribeTransitGatewaysInput{
-			TransitGatewayIds: []*string{aws.String(transitGatewayID)},
+			TransitGatewayIds: []*string{awssdk.String(transitGatewayID)},
 		})
 
 		Expect(err).NotTo(HaveOccurred())
@@ -111,12 +117,12 @@ var _ = Describe("Transit Gateways", func() {
 			describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
 				Filters: []*ec2.Filter{
 					{
-						Name:   aws.String("transit-gateway-id"),
-						Values: []*string{aws.String(transitGatewayID)},
+						Name:   awssdk.String("transit-gateway-id"),
+						Values: []*string{awssdk.String(transitGatewayID)},
 					},
 					{
-						Name:   aws.String("vpc-id"),
-						Values: []*string{aws.String(fixture.GetVpcID())},
+						Name:   awssdk.String("vpc-id"),
+						Values: []*string{awssdk.String(fixture.GetVpcID())},
 					},
 				},
 			}
@@ -136,44 +142,39 @@ var _ = Describe("Transit Gateways", func() {
 		Eventually(getPrefixlistIDAnnotation).ShouldNot(BeEmpty())
 
 		result, err := rawEC2Client.GetManagedPrefixListEntries(&ec2.GetManagedPrefixListEntriesInput{
-			PrefixListId: aws.String(prefixListID),
-			MaxResults:   aws.Int64(100),
+			PrefixListId: awssdk.String(prefixListID),
+			MaxResults:   awssdk.Int64(100),
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		prefixListDescription := fmt.Sprintf("CIDR block for cluster %s", fixture.GetManagementAWSCluster().ObjectMeta.Name)
-		descriptionFound := false
-		for _, entry := range result.Entries {
-			if *entry.Cidr == fixture.GetManagementAWSCluster().Spec.NetworkSpec.VPC.CidrBlock {
-				if *entry.Description == prefixListDescription {
-					descriptionFound = true
-				}
-				break
-			}
-		}
-		Expect(descriptionFound).To(BeTrue())
+		managementAWSCluster := fixture.GetManagementAWSCluster()
+		prefixListDescription := fmt.Sprintf("CIDR block for cluster %s", managementAWSCluster.Name)
+		Expect(result.Entries).To(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
+			"Cidr":        PointTo(Equal(managementAWSCluster.Spec.NetworkSpec.VPC.CidrBlock)),
+			"Description": PointTo(Equal(prefixListDescription)),
+		}))))
+
 		checkRouteTables := func() []*ec2.RouteTable {
 			subnets := []*string{}
-			for _, s := range fixture.GetManagementAWSCluster().Spec.NetworkSpec.Subnets {
-				subnets = append(subnets, aws.String(s.ID))
+			for _, s := range managementAWSCluster.Spec.NetworkSpec.Subnets {
+				subnets = append(subnets, awssdk.String(s.ID))
 			}
 
 			routeTablesOutput, err := rawEC2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
 				Filters: []*ec2.Filter{
-					{Name: aws.String("association.subnet-id"), Values: subnets},
+					{Name: awssdk.String("association.subnet-id"), Values: subnets},
 				},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(routeTablesOutput).NotTo(BeNil())
-			Expect(routeTablesOutput.RouteTables).NotTo(HaveLen(0))
 
 			return routeTablesOutput.RouteTables
 		}
-		Eventually(checkRouteTables).Should(ContainElement(MatchFields(IgnoreExtras, Fields{
-			"Routes": ContainElement(MatchFields(IgnoreExtras, Fields{
-				"DestinationPrefixListId": Equal(prefixListID),
-				"TransitGatewayId":        Equal(transitGatewayID),
-			})),
-		})))
+		Eventually(checkRouteTables).Should(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
+			"Routes": ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
+				"DestinationPrefixListId": PointTo(Equal(prefixListID)),
+				"TransitGatewayId":        PointTo(Equal(transitGatewayID)),
+			}))),
+		}))))
 	})
 })

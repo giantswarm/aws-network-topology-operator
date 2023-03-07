@@ -3,14 +3,12 @@ package registrar
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/arn"
+	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 	awsclient "github.com/giantswarm/aws-network-topology-operator/pkg/aws"
 	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 )
@@ -117,7 +116,10 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 					return err
 				}
 
-				gatewayID = annotations.GetNetworkTopologyTransitGateway(mc)
+				gatewayID, err = getTransitGatewayID(logger, mc)
+				if err != nil {
+					return err
+				}
 				if gatewayID == "" {
 					err = fmt.Errorf("management cluster doesn't have a TGW specified")
 					logger.Error(err, "The Management Cluster doesn't have a Transit Gateway ID specified")
@@ -168,13 +170,13 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			logger.Info("Sending SNS message")
 
 			_, err = r.transitGatewayClient.PublishSNSMessage(ctx, &sns.PublishInput{
-				Message: aws.String("Request TransitGatewayAttachment"),
+				Message: awssdk.String("Request TransitGatewayAttachment"),
 				MessageAttributes: map[string]snstypes.MessageAttributeValue{
-					"Postfach":      {DataType: aws.String("String"), StringValue: aws.String("support@giantswarm.io")},
-					"Account_ID":    {DataType: aws.String("String"), StringValue: tgwAttachment.VpcOwnerId},
-					"Attachment_ID": {DataType: aws.String("String"), StringValue: tgwAttachment.TransitGatewayAttachmentId},
-					"CIDR":          {DataType: aws.String("String"), StringValue: &awsCluster.Spec.NetworkSpec.VPC.CidrBlock},
-					"Name":          {DataType: aws.String("String"), StringValue: &cluster.ObjectMeta.Name},
+					"Postfach":      {DataType: awssdk.String("String"), StringValue: awssdk.String("support@giantswarm.io")},
+					"Account_ID":    {DataType: awssdk.String("String"), StringValue: tgwAttachment.VpcOwnerId},
+					"Attachment_ID": {DataType: awssdk.String("String"), StringValue: tgwAttachment.TransitGatewayAttachmentId},
+					"CIDR":          {DataType: awssdk.String("String"), StringValue: &awsCluster.Spec.NetworkSpec.VPC.CidrBlock},
+					"Name":          {DataType: awssdk.String("String"), StringValue: &cluster.ObjectMeta.Name},
 				},
 			})
 			if err != nil {
@@ -205,7 +207,10 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 					return err
 				}
 
-				gatewayID = annotations.GetNetworkTopologyTransitGateway(mc)
+				gatewayID, err = getTransitGatewayID(logger, mc)
+				if err != nil {
+					return err
+				}
 				if gatewayID == "" {
 					err = fmt.Errorf("management cluster doesn't have a TGW specified")
 					logger.Error(err, "The Management Cluster doesn't have a Transit Gateway ID specified")
@@ -280,7 +285,10 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) error {
 	logger := r.getLogger(ctx)
 
-	gatewayID := annotations.GetNetworkTopologyTransitGateway(cluster)
+	gatewayID, err := getTransitGatewayID(logger, cluster)
+	if err != nil {
+		return err
+	}
 
 	switch val := annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation); val {
 	case "":
@@ -391,7 +399,7 @@ func (r *TransitGateway) getOrCreateTransitGateway(ctx context.Context, gatewayI
 		logger.Info("No existing TGW found, creating a new one")
 
 		output, err := r.transitGatewayClient.CreateTransitGateway(ctx, &ec2.CreateTransitGatewayInput{
-			Description: aws.String(fmt.Sprintf("Transit Gateway for cluster %s", ctx.Value(clusterNameContextKey))),
+			Description: awssdk.String(fmt.Sprintf("Transit Gateway for cluster %s", ctx.Value(clusterNameContextKey))),
 			Options: &types.TransitGatewayRequestOptions{
 				AutoAcceptSharedAttachments: types.AutoAcceptSharedAttachmentsValueEnable,
 			},
@@ -400,8 +408,8 @@ func (r *TransitGateway) getOrCreateTransitGateway(ctx context.Context, gatewayI
 					ResourceType: types.ResourceTypeTransitGateway,
 					Tags: []types.Tag{
 						{
-							Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", ctx.Value(clusterNameContextKey))),
-							Value: aws.String("owned"),
+							Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", ctx.Value(clusterNameContextKey))),
+							Value: awssdk.String("owned"),
 						},
 					},
 				},
@@ -446,11 +454,11 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
 		Filters: []types.Filter{
 			{
-				Name:   aws.String("transit-gateway-id"),
+				Name:   awssdk.String("transit-gateway-id"),
 				Values: []string{*gatewayID},
 			},
 			{
-				Name:   aws.String("vpc-id"),
+				Name:   awssdk.String("vpc-id"),
 				Values: []string{vpcID},
 			},
 		},
@@ -471,12 +479,12 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 					ResourceType: types.ResourceTypeTransitGatewayAttachment,
 					Tags: []types.Tag{
 						{
-							Key:   aws.String("Name"),
-							Value: aws.String(awsCluster.Name),
+							Key:   awssdk.String("Name"),
+							Value: awssdk.String(awsCluster.Name),
 						},
 						{
-							Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", ctx.Value(clusterNameContextKey))),
-							Value: aws.String("owned"),
+							Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", ctx.Value(clusterNameContextKey))),
+							Value: awssdk.String("owned"),
 						},
 					},
 				},
@@ -533,11 +541,11 @@ func (r *TransitGateway) detachTransitGateway(ctx context.Context, gatewayID *st
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
 		Filters: []types.Filter{
 			{
-				Name:   aws.String("transit-gateway-id"),
+				Name:   awssdk.String("transit-gateway-id"),
 				Values: []string{*gatewayID},
 			},
 			{
-				Name:   aws.String("vpc-id"),
+				Name:   awssdk.String("vpc-id"),
 				Values: []string{vpcID},
 			},
 		},
@@ -583,7 +591,7 @@ func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context) (*types.Mana
 		result, err := r.transitGatewayClient.DescribeManagedPrefixLists(ctx, &ec2.DescribeManagedPrefixListsInput{
 			Filters: []types.Filter{
 				{
-					Name:   aws.String("prefix-list-id"),
+					Name:   awssdk.String("prefix-list-id"),
 					Values: []string{prefixListID},
 				},
 			},
@@ -598,7 +606,7 @@ func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context) (*types.Mana
 	result, err := r.transitGatewayClient.DescribeManagedPrefixLists(ctx, &ec2.DescribeManagedPrefixListsInput{
 		Filters: []types.Filter{
 			{
-				Name:   aws.String("prefix-list-name"),
+				Name:   awssdk.String("prefix-list-name"),
 				Values: []string{prefixListName},
 			},
 		},
@@ -615,8 +623,8 @@ func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context) (*types.Mana
 	}
 
 	output, err := r.transitGatewayClient.CreateManagedPrefixList(ctx, &ec2.CreateManagedPrefixListInput{
-		AddressFamily:  aws.String("IPv4"),
-		MaxEntries:     aws.Int32(PREFIX_LIST_MAX_ENTRIES),
+		AddressFamily:  awssdk.String("IPv4"),
+		MaxEntries:     awssdk.Int32(PREFIX_LIST_MAX_ENTRIES),
 		PrefixListName: &prefixListName,
 	})
 	if err != nil {
@@ -644,7 +652,7 @@ func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefix
 
 	output, err := transitGatewayAttachmentClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
-			{Name: aws.String("association.subnet-id"), Values: subnets},
+			{Name: awssdk.String("association.subnet-id"), Values: subnets},
 		},
 	})
 	if err != nil {
@@ -709,7 +717,7 @@ func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSC
 
 	output, err := transitGatewayAttachmentClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
-			{Name: aws.String("association.subnet-id"), Values: subnets},
+			{Name: awssdk.String("association.subnet-id"), Values: subnets},
 		},
 	})
 	if err != nil {
@@ -745,7 +753,7 @@ func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.A
 
 	result, err := r.transitGatewayClient.GetManagedPrefixListEntries(ctx, &ec2.GetManagedPrefixListEntriesInput{
 		PrefixListId:  &prefixListID,
-		MaxResults:    aws.Int32(100),
+		MaxResults:    awssdk.Int32(100),
 		TargetVersion: prefixList.Version,
 	})
 	if err != nil {
@@ -798,7 +806,7 @@ func (r *TransitGateway) removeFromPrefixList(ctx context.Context, awsCluster *c
 
 	result, err := r.transitGatewayClient.GetManagedPrefixListEntries(ctx, &ec2.GetManagedPrefixListEntriesInput{
 		PrefixListId:  prefixList.PrefixListId,
-		MaxResults:    aws.Int32(100),
+		MaxResults:    awssdk.Int32(100),
 		TargetVersion: prefixList.Version,
 	})
 	if err != nil {
@@ -834,9 +842,9 @@ func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, 
 	result := make([]string, 0)
 	output, err := transitGatewayClient.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
 		Filters: []types.Filter{
-			{Name: aws.String("tag:" + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
-			{Name: aws.String("tag:" + SubnetTGWAttachementsLabel), Values: []string{"true"}},
-			{Name: aws.String("tag:" + SubnetRoleLabel), Values: []string{"private"}},
+			{Name: awssdk.String("tag:" + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
+			{Name: awssdk.String("tag:" + SubnetTGWAttachementsLabel), Values: []string{"true"}},
+			{Name: awssdk.String("tag:" + SubnetRoleLabel), Values: []string{"private"}},
 		},
 	})
 	if err != nil {
@@ -874,7 +882,7 @@ func getPrivateSubnetsByAZ(subnets capa.Subnets) []string {
 }
 
 func buildEntryDescription(awsCluster *capa.AWSCluster) string {
-	return fmt.Sprintf("CIDR block for cluster %s", awsCluster.ObjectMeta.Name)
+	return fmt.Sprintf("CIDR block for cluster %s", awsCluster.Name)
 }
 
 func getTransitGatewayID(logger logr.Logger, cluster *capi.Cluster) (string, error) {
@@ -883,13 +891,5 @@ func getTransitGatewayID(logger logr.Logger, cluster *capi.Cluster) (string, err
 		return "", nil
 	}
 
-	gatewayARN, err := arn.Parse(gatewayARNAnnotation)
-	if err != nil {
-		logger.Error(err, "Failed to parse transit gateway ARN")
-		return "", err
-	}
-
-	// The ARN struct holds the resource in the format "<resource-type>/<resource-name>"
-	resourceSplit := strings.Split(gatewayARN.Resource, "/")
-	return resourceSplit[1], nil
+	return aws.GetARNResourceID(gatewayARNAnnotation)
 }
