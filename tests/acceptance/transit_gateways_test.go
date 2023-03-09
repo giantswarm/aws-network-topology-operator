@@ -143,7 +143,14 @@ var _ = Describe("Transit Gateways", func() {
 			cluster := &capi.Cluster{}
 			err := k8sClient.Get(ctx, fixture.GetManagementClusterNamespacedName(), cluster)
 			Expect(err).NotTo(HaveOccurred())
-			prefixListID = annotations.GetNetworkTopologyPrefixList(cluster)
+			prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
+			if prefixListARN == "" {
+				return ""
+			}
+
+			prefixListID, err = aws.GetARNResourceID(prefixListARN)
+			Expect(err).NotTo(HaveOccurred())
+
 			return prefixListID
 		}
 		Eventually(getPrefixlistIDAnnotation).ShouldNot(BeEmpty())
@@ -187,14 +194,14 @@ var _ = Describe("Transit Gateways", func() {
 		err = fixture.CreateWCOnAnotherAccount(ctx, k8sClient, rawEC2Client, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListID)
 		Expect(err).NotTo(HaveOccurred())
 
-		getResourceShares := func() {
+		getResourceShares := func() []*ram.ResourceShare {
 			resourceShare, err := ramClient.GetResourceShares(&ram.GetResourceSharesInput{
 				Name:          awssdk.String(fmt.Sprintf("%s-transit-gateway", fixture.GetWorkloadClusterNamespacedName().Name)),
 				ResourceOwner: awssdk.String("SELF"),
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resourceShare).NotTo(BeNil())
-
+			return resourceShare.ResourceShares
 		}
 		Eventually(getResourceShares).Should(HaveLen(1))
 	})

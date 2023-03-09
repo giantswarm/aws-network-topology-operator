@@ -45,8 +45,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		transitGatewayClientForWorkloadCluster *awsfakes.FakeTransitGatewayClient
 
 		transitGatewayID  = "abc-123"
-		transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateway/%s", transitGatewayID)
+		transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", transitGatewayID)
 		prefixListID      = "prefix-123"
+		prefixListARN     = fmt.Sprintf("arn:aws:iam::123456789012:prefix-lists/%s", prefixListID)
 		mcVPCId           = "vpc-123"
 		wcVPCId           = "vpc-987"
 
@@ -911,8 +912,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.CreateManagedPrefixListReturns(
 						&ec2.CreateManagedPrefixListOutput{
 							PrefixList: &awstypes.ManagedPrefixList{
-								PrefixListId: &prefixListID,
-								Version:      aws.Int64(1),
+								PrefixListId:  &prefixListID,
+								PrefixListArn: &prefixListARN,
+								Version:       aws.Int64(1),
 							},
 						},
 						nil,
@@ -1038,7 +1040,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1153,7 +1159,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1252,7 +1262,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1358,7 +1372,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1478,7 +1496,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1598,7 +1620,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1815,7 +1841,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,

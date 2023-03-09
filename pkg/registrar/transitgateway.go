@@ -788,7 +788,7 @@ func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.A
 
 			// entry already exists
 			logger.Info("Entry already exists in prefix list, skipping")
-			return nil, err
+			return prefixList, err
 		}
 	}
 

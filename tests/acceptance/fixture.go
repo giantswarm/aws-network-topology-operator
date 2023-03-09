@@ -20,18 +20,20 @@ import (
 )
 
 type Fixture struct {
-	associtationID                        string
-	managementCluster                     *capi.Cluster
-	managementAWSCluster                  *capa.AWSCluster
-	workloadClusterForSharing             *capi.Cluster
-	workloadAWSClusterForSharing          *capa.AWSCluster
-	clusterRoleIdentity                   *capa.AWSClusterRoleIdentity
-	workloadClusterRoleIdentityForSharing *capa.AWSClusterRoleIdentity
-	routeTableId                          string
-	subnetId                              string
-	vpcId                                 string
-	vpcIdWC                               string
-	subnetIdWC                            string
+	managementCluster             *capi.Cluster
+	managementAWSCluster          *capa.AWSCluster
+	managementClusterRoleIdentity *capa.AWSClusterRoleIdentity
+
+	workloadCluster             *capi.Cluster
+	workloadAWSCluster          *capa.AWSCluster
+	workloadClusterRoleIdentity *capa.AWSClusterRoleIdentity
+
+	associtationID string
+	routeTableId   string
+	subnetId       string
+	vpcId          string
+	vpcIdWC        string
+	subnetIdWC     string
 }
 
 func (f *Fixture) GetManagementClusterNamespacedName() types.NamespacedName {
@@ -51,12 +53,13 @@ func (f *Fixture) GetManagementAWSCluster() *capa.AWSCluster {
 }
 
 func (f *Fixture) GetWorkloadClusterNamespacedName() types.NamespacedName {
-	return k8sclient.GetNamespacedName(f.workloadClusterForSharing)
+	return k8sclient.GetNamespacedName(f.workloadCluster)
 }
 
 func (f *Fixture) GetClusterRoleIdentity() *capa.AWSClusterRoleIdentity {
-	return f.clusterRoleIdentity
+	return f.managementClusterRoleIdentity
 }
+
 func (f *Fixture) GetVpcID() string {
 	return f.vpcId
 }
@@ -101,7 +104,7 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 	}
 	f.associtationID = *assocRouteTableOutput.AssociationId
 
-	f.clusterRoleIdentity = &capa.AWSClusterRoleIdentity{
+	f.managementClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -116,7 +119,7 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 		},
 	}
 
-	err = k8sClient.Create(ctx, f.clusterRoleIdentity)
+	err = k8sClient.Create(ctx, f.managementClusterRoleIdentity)
 	if err != nil {
 		return fmt.Errorf("error while creating AWSClusterRoleIdentity: %w", err)
 	}
@@ -178,7 +181,6 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 }
 
 func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListID string) error {
-
 	createVpcOutput, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String("172.32.0.0/16"),
 	})
@@ -200,7 +202,7 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 	f.subnetIdWC = *createSubnetOutput.Subnet.SubnetId
 
 	name := tests.GenerateGUID("test-share")
-	f.workloadClusterRoleIdentityForSharing = &capa.AWSClusterRoleIdentity{
+	f.workloadClusterRoleIdentity = &capa.AWSClusterRoleIdentity{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -215,12 +217,12 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 		},
 	}
 
-	err = k8sClient.Create(ctx, f.clusterRoleIdentity)
+	err = k8sClient.Create(ctx, f.workloadClusterRoleIdentity)
 	if err != nil {
 		return fmt.Errorf("error while creating AWSClusterRoleIdentity: %w", err)
 	}
 
-	f.managementCluster = &capi.Cluster{
+	f.workloadCluster = &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-wc-share",
 			Namespace: "test",
@@ -239,7 +241,7 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 			},
 		},
 	}
-	f.managementAWSCluster = &capa.AWSCluster{
+	f.workloadAWSCluster = &capa.AWSCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-wc-share",
 			Namespace: "test",
@@ -265,12 +267,12 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 		},
 	}
 
-	err = k8sClient.Create(ctx, f.managementCluster)
+	err = k8sClient.Create(ctx, f.workloadCluster)
 	if err != nil {
 		return fmt.Errorf("error while creating Cluster: %w", err)
 	}
 
-	err = k8sClient.Create(ctx, f.managementAWSCluster)
+	err = k8sClient.Create(ctx, f.workloadAWSCluster)
 	if err != nil {
 		return fmt.Errorf("error while creating AWSCluster: %w", err)
 	}
