@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ram"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
@@ -27,10 +28,12 @@ import (
 
 var _ = Describe("Transit Gateways", func() {
 	var (
-		ctx          context.Context
-		fixture      *acceptance.Fixture
-		prefixListID string
-		rawEC2Client *ec2.EC2
+		ctx               context.Context
+		fixture           *acceptance.Fixture
+		prefixListID      string
+		rawEC2Client      *ec2.EC2
+		transitGatewayARN string
+		ramClient         *ram.RAM
 	)
 
 	BeforeEach(func() {
@@ -47,6 +50,10 @@ var _ = Describe("Transit Gateways", func() {
 				Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
 			},
 		)
+
+		ramClient = ram.New(session, &awssdk.Config{
+			Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
+		})
 
 		fixture = &acceptance.Fixture{}
 		err = fixture.Setup(ctx, k8sClient, rawEC2Client, mcIAMRoleARN, awsRegion, availabilityZone)
@@ -96,7 +103,7 @@ var _ = Describe("Transit Gateways", func() {
 			cluster := &capi.Cluster{}
 			err := k8sClient.Get(ctx, fixture.GetManagementClusterNamespacedName(), cluster)
 			g.Expect(err).NotTo(HaveOccurred())
-			transitGatewayARN := annotations.GetNetworkTopologyTransitGateway(cluster)
+			transitGatewayARN = annotations.GetNetworkTopologyTransitGateway(cluster)
 			if transitGatewayARN == "" {
 				return ""
 			}
@@ -136,7 +143,7 @@ var _ = Describe("Transit Gateways", func() {
 			cluster := &capi.Cluster{}
 			err := k8sClient.Get(ctx, fixture.GetManagementClusterNamespacedName(), cluster)
 			Expect(err).NotTo(HaveOccurred())
-			prefixListID = annotations.GetNetworkTopologyPrefixListID(cluster)
+			prefixListID = annotations.GetNetworkTopologyPrefixList(cluster)
 			return prefixListID
 		}
 		Eventually(getPrefixlistIDAnnotation).ShouldNot(BeEmpty())
@@ -176,5 +183,19 @@ var _ = Describe("Transit Gateways", func() {
 				"TransitGatewayId":        PointTo(Equal(transitGatewayID)),
 			}))),
 		}))))
+
+		err = fixture.CreateWCOnAnotherAccount(ctx, k8sClient, rawEC2Client, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListID)
+		Expect(err).NotTo(HaveOccurred())
+
+		getResourceShares := func() {
+			resourceShare, err := ramClient.GetResourceShares(&ram.GetResourceSharesInput{
+				Name:          awssdk.String(fmt.Sprintf("%s-transit-gateway", fixture.GetWorkloadClusterNamespacedName().Name)),
+				ResourceOwner: awssdk.String("SELF"),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resourceShare).NotTo(BeNil())
+
+		}
+		Eventually(getResourceShares).Should(HaveLen(1))
 	})
 })

@@ -42,6 +42,8 @@ spec:
           env:
           - name: AWS_SHARED_CREDENTIALS_FILE
             value: /home/.aws/credentials
+          - name: AWS_SDK_LOAD_CONFIG
+            value: "1"
           securityContext:
             {{- with .Values.securityContext }}
               {{- . | toYaml | nindent 12 }}

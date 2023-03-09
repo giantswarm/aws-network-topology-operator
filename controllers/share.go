@@ -102,7 +102,7 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 		return ctrl.Result{}, nil
 	}
 
-	prefixListAnnotation := annotations.GetNetworkTopologyPrefixListID(cluster)
+	prefixListAnnotation := annotations.GetNetworkTopologyPrefixList(cluster)
 
 	if prefixListAnnotation == "" {
 		logger.Info("prefix list arn annotation not set yet")

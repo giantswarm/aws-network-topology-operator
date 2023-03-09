@@ -20,13 +20,18 @@ import (
 )
 
 type Fixture struct {
-	associtationID       string
-	managementCluster    *capi.Cluster
-	managementAWSCluster *capa.AWSCluster
-	clusterRoleIdentity  *capa.AWSClusterRoleIdentity
-	routeTableId         string
-	subnetId             string
-	vpcId                string
+	associtationID                        string
+	managementCluster                     *capi.Cluster
+	managementAWSCluster                  *capa.AWSCluster
+	workloadClusterForSharing             *capi.Cluster
+	workloadAWSClusterForSharing          *capa.AWSCluster
+	clusterRoleIdentity                   *capa.AWSClusterRoleIdentity
+	workloadClusterRoleIdentityForSharing *capa.AWSClusterRoleIdentity
+	routeTableId                          string
+	subnetId                              string
+	vpcId                                 string
+	vpcIdWC                               string
+	subnetIdWC                            string
 }
 
 func (f *Fixture) GetManagementClusterNamespacedName() types.NamespacedName {
@@ -43,6 +48,10 @@ func (f *Fixture) GetManagementAWSClusterNamespacedName() types.NamespacedName {
 
 func (f *Fixture) GetManagementAWSCluster() *capa.AWSCluster {
 	return f.managementAWSCluster
+}
+
+func (f *Fixture) GetWorkloadClusterNamespacedName() types.NamespacedName {
+	return k8sclient.GetNamespacedName(f.workloadClusterForSharing)
 }
 
 func (f *Fixture) GetClusterRoleIdentity() *capa.AWSClusterRoleIdentity {
@@ -148,6 +157,107 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 					{
 						CidrBlock: "172.64.0.0/20",
 						ID:        f.subnetId,
+						IsPublic:  false,
+					},
+				},
+			},
+		},
+	}
+
+	err = k8sClient.Create(ctx, f.managementCluster)
+	if err != nil {
+		return fmt.Errorf("error while creating Cluster: %w", err)
+	}
+
+	err = k8sClient.Create(ctx, f.managementAWSCluster)
+	if err != nil {
+		return fmt.Errorf("error while creating AWSCluster: %w", err)
+	}
+
+	return nil
+}
+
+func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListID string) error {
+
+	createVpcOutput, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
+		CidrBlock: aws.String("172.32.0.0/16"),
+	})
+	if err != nil {
+		return fmt.Errorf("error while creating vpc: %w", err)
+	}
+
+	f.vpcIdWC = *createVpcOutput.Vpc.VpcId
+
+	createSubnetOutput, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
+		CidrBlock:         aws.String("172.32.0.0/20"),
+		VpcId:             aws.String(f.vpcIdWC),
+		AvailabilityZone:  &availabilityZone,
+		TagSpecifications: generateTagSpecifications(),
+	})
+	if err != nil {
+		return fmt.Errorf("error while creating subnet: %w", err)
+	}
+	f.subnetIdWC = *createSubnetOutput.Subnet.SubnetId
+
+	name := tests.GenerateGUID("test-share")
+	f.workloadClusterRoleIdentityForSharing = &capa.AWSClusterRoleIdentity{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: capa.AWSClusterRoleIdentitySpec{
+			AWSRoleSpec: capa.AWSRoleSpec{
+				RoleArn: wcIAMRoleARN,
+			},
+			SourceIdentityRef: &capa.AWSIdentityReference{
+				Name: "default",
+				Kind: capa.ControllerIdentityKind,
+			},
+		},
+	}
+
+	err = k8sClient.Create(ctx, f.clusterRoleIdentity)
+	if err != nil {
+		return fmt.Errorf("error while creating AWSClusterRoleIdentity: %w", err)
+	}
+
+	f.managementCluster = &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-wc-share",
+			Namespace: "test",
+			Annotations: map[string]string{
+				gsannotations.NetworkTopologyModeAnnotation:             gsannotations.NetworkTopologyModeGiantSwarmManaged,
+				gsannotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
+				gsannotations.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+			},
+		},
+		Spec: capi.ClusterSpec{
+			InfrastructureRef: &corev1.ObjectReference{
+				APIVersion: capa.GroupVersion.String(),
+				Kind:       "AWSCluster",
+				Namespace:  "test",
+				Name:       "test-wc-share",
+			},
+		},
+	}
+	f.managementAWSCluster = &capa.AWSCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-wc-share",
+			Namespace: "test",
+		},
+		Spec: capa.AWSClusterSpec{
+			IdentityRef: &capa.AWSIdentityReference{
+				Name: name,
+				Kind: capa.ClusterRoleIdentityKind,
+			},
+			NetworkSpec: capa.NetworkSpec{
+				VPC: capa.VPCSpec{
+					ID:        f.vpcIdWC,
+					CidrBlock: "172.32.0.0/16",
+				},
+				Subnets: []capa.SubnetSpec{
+					{
+						CidrBlock: "172.32.0.0/20",
+						ID:        f.subnetIdWC,
 						IsPublic:  false,
 					},
 				},

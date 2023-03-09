@@ -111,6 +111,7 @@ func main() {
 		Namespace: managementClusterNamespace,
 	}
 	client := k8sclient.NewCluster(mgr.GetClient(), managementCluster)
+	// Since share reconciler should work on MC account, region from credentials can be directly used.
 	session := session.Must(session.NewSession())
 
 	ec2Service := aws.NewEC2Client(ctx, client, managementCluster)

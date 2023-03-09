@@ -51,7 +51,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	mcAccount := tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
-	wcAccount := tests.GetEnvOrSkip("WC_AWS_ACCOUNT")
+	wcAccount := tests.GetEnvOrSkip("WC_AWS_ACCOUNT_ORIGINAL")
 	iamRoleId := tests.GetEnvOrSkip("AWS_IAM_ROLE_ID")
 	awsRegion = tests.GetEnvOrSkip("AWS_REGION")
 	availabilityZone = fmt.Sprintf("%sa", awsRegion)
