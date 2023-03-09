@@ -2,6 +2,7 @@ package registrar
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -9,9 +10,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/smithy-go"
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -36,6 +38,8 @@ const (
 
 	SubnetTGWAttachementsLabel = "subnet.giantswarm.io/tgw"
 	SubnetRoleLabel            = "github.com/giantswarm/aws-vpc-operator/role"
+
+	ErrRouteNotFound = "InvalidRoute.NotFound"
 )
 
 //counterfeiter:generate . ClusterClient
@@ -299,7 +303,7 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 
 	case annotation.NetworkTopologyModeUserManaged:
 		awsCluster, err := r.getAWSCluster(ctx, cluster)
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			logger.Info("AWSCluster is already deleted, skipping transit gateway deletion")
 			return nil
 		} else if err != nil {
@@ -313,7 +317,7 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 
 	case annotation.NetworkTopologyModeGiantSwarmManaged:
 		awsCluster, err := r.getAWSCluster(ctx, cluster)
-		if errors.IsNotFound(err) {
+		if k8sErrors.IsNotFound(err) {
 			logger.Info("AWSCluster is already deleted, skipping transit gateway deletion")
 			return nil
 		} else if err != nil {
@@ -727,18 +731,24 @@ func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSC
 
 	if output != nil && len(output.RouteTables) > 0 {
 		for _, rt := range output.RouteTables {
+			var routeDeletionError smithy.APIError
 			_, err = transitGatewayAttachmentClient.DeleteRoute(ctx, &ec2.DeleteRouteInput{
 				RouteTableId:            rt.RouteTableId,
 				DestinationPrefixListId: &prefixListID,
 			})
 			if err != nil {
+				if errors.As(err, &routeDeletionError) {
+					if routeDeletionError.ErrorCode() == ErrRouteNotFound {
+						logger.Info("Route to delete is not present, skipping...")
+						continue
+					}
+				}
 				logger.Error(err, "Failed to remove route from route table", "routeTableID", rt.RouteTableId, "prefixListID", prefixListID)
 				return err
 			}
 			logger.Info("Removed routes from route table", "routeTableID", rt.RouteTableId, "prefixListID", prefixListID)
 		}
 	}
-
 	return nil
 }
 
