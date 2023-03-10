@@ -428,18 +428,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					nil,
 				)
 
-				transitGatewayClient.DescribeRouteTablesReturns(
-					&ec2.DescribeRouteTablesOutput{
-						RouteTables: []awstypes.RouteTable{
-							{
-								RouteTableId: aws.String("rt-123"),
-								Routes:       []awstypes.Route{},
-							},
-						},
-					},
-					nil,
-				)
-
 				clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 					Name:      mcCluster.ObjectMeta.Name,
 					Namespace: mcCluster.ObjectMeta.Namespace,
@@ -449,6 +437,17 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
 					&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
 						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+					},
+					nil,
+				)
+				transitGatewayClientForWorkloadCluster.DescribeRouteTablesReturns(
+					&ec2.DescribeRouteTablesOutput{
+						RouteTables: []awstypes.RouteTable{
+							{
+								RouteTableId: aws.String("rt-123"),
+								Routes:       []awstypes.Route{},
+							},
+						},
 					},
 					nil,
 				)
@@ -515,7 +514,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should create routes on subnet route tables", func() {
-					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
+					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(1))
 				})
 
 				It("should not send the SNS message", func() {
@@ -581,18 +580,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					nil,
 				)
 
-				transitGatewayClient.DescribeRouteTablesReturns(
-					&ec2.DescribeRouteTablesOutput{
-						RouteTables: []awstypes.RouteTable{
-							{
-								RouteTableId: aws.String("rt-123"),
-								Routes:       []awstypes.Route{},
-							},
-						},
-					},
-					nil,
-				)
-
 				clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 					Name:      mcCluster.ObjectMeta.Name,
 					Namespace: mcCluster.ObjectMeta.Namespace,
@@ -602,6 +589,17 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				transitGatewayClientForWorkloadCluster.DescribeTransitGatewayVpcAttachmentsReturns(
 					&ec2.DescribeTransitGatewayVpcAttachmentsOutput{
 						TransitGatewayVpcAttachments: []awstypes.TransitGatewayVpcAttachment{},
+					},
+					nil,
+				)
+				transitGatewayClientForWorkloadCluster.DescribeRouteTablesReturns(
+					&ec2.DescribeRouteTablesOutput{
+						RouteTables: []awstypes.RouteTable{
+							{
+								RouteTableId: aws.String("rt-123"),
+								Routes:       []awstypes.Route{},
+							},
+						},
 					},
 					nil,
 				)
@@ -672,7 +670,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should create routes on subnet route tables", func() {
-					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
+					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(1))
 				})
 
 				It("should not send the SNS message", func() {
@@ -728,18 +726,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					nil,
 				)
 
-				transitGatewayClient.DescribeRouteTablesReturns(
-					&ec2.DescribeRouteTablesOutput{
-						RouteTables: []awstypes.RouteTable{
-							{
-								RouteTableId: aws.String("rt-123"),
-								Routes:       []awstypes.Route{},
-							},
-						},
-					},
-					nil,
-				)
-
 				clusterClient = k8sclient.NewCluster(k8sClient, types.NamespacedName{
 					Name:      mcCluster.ObjectMeta.Name,
 					Namespace: mcCluster.ObjectMeta.Namespace,
@@ -754,6 +740,17 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 								TransitGatewayId:           &transitGatewayID,
 								VpcId:                      &wcAWSCluster.Spec.NetworkSpec.VPC.ID,
 								State:                      awstypes.TransitGatewayAttachmentStateAvailable,
+							},
+						},
+					},
+					nil,
+				)
+				transitGatewayClientForWorkloadCluster.DescribeRouteTablesReturns(
+					&ec2.DescribeRouteTablesOutput{
+						RouteTables: []awstypes.RouteTable{
+							{
+								RouteTableId: aws.String("rt-123"),
+								Routes:       []awstypes.Route{},
 							},
 						},
 					},
@@ -794,7 +791,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			})
 
 			It("should create routes on subnet route tables", func() {
-				Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(1))
+				Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(1))
 			})
 
 		})
@@ -1005,7 +1002,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should not create routes on subnet route tables", func() {
-					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(0))
 				})
 			})
 
@@ -1119,7 +1116,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should not create routes on subnet route tables", func() {
-					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(0))
 				})
 			})
 
@@ -1217,7 +1214,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				})
 
 				It("should not create routes on subnet route tables", func() {
-					Expect(transitGatewayClient.CreateRouteCallCount()).To(Equal(0))
+					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(0))
 				})
 			})
 
