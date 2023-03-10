@@ -595,7 +595,13 @@ func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefix
 		subnets = append(subnets, s.ID)
 	}
 
-	output, err := r.transitGatewayClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+	// Creation of routes need to be made from the AWS account of the workload cluster
+	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
+		Name:      awsCluster.ObjectMeta.Name,
+		Namespace: awsCluster.ObjectMeta.Namespace,
+	})
+
+	output, err := transitGatewayAttachmentClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
 			{Name: aws.String("association.subnet-id"), Values: subnets},
 		},
@@ -618,7 +624,7 @@ func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefix
 				continue
 			}
 
-			_, err = r.transitGatewayClient.CreateRoute(ctx, &ec2.CreateRouteInput{
+			_, err = transitGatewayAttachmentClient.CreateRoute(ctx, &ec2.CreateRouteInput{
 				RouteTableId:            rt.RouteTableId,
 				DestinationPrefixListId: prefixListID,
 				TransitGatewayId:        transitGatewayID,
@@ -654,7 +660,13 @@ func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSC
 		subnets = append(subnets, s.ID)
 	}
 
-	output, err := r.transitGatewayClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+	// Creation of routes need to be made from the AWS account of the workload cluster
+	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
+		Name:      awsCluster.ObjectMeta.Name,
+		Namespace: awsCluster.ObjectMeta.Namespace,
+	})
+
+	output, err := transitGatewayAttachmentClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
 			{Name: aws.String("association.subnet-id"), Values: subnets},
 		},
@@ -666,7 +678,7 @@ func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSC
 
 	if output != nil && len(output.RouteTables) > 0 {
 		for _, rt := range output.RouteTables {
-			_, err = r.transitGatewayClient.DeleteRoute(ctx, &ec2.DeleteRouteInput{
+			_, err = transitGatewayAttachmentClient.DeleteRoute(ctx, &ec2.DeleteRouteInput{
 				RouteTableId:            rt.RouteTableId,
 				DestinationPrefixListId: &prefixListID,
 			})
