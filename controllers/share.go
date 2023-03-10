@@ -111,13 +111,13 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 
 	transitGatewayARN, err := arn.Parse(transitGatewayAnnotation)
 	if err != nil {
-		logger.Error(err, "failed to parse transit gateway arn")
+		logger.Error(err, "failed to parse transit gateway arn", "Annotation", transitGatewayAnnotation)
 		return ctrl.Result{}, err
 	}
 
 	prefixListARN, err := arn.Parse(prefixListAnnotation)
 	if err != nil {
-		logger.Error(err, "failed to parse transit gateway arn")
+		logger.Error(err, "failed to parse prefix list arn", "Annotation", prefixListAnnotation)
 		return ctrl.Result{}, err
 	}
 

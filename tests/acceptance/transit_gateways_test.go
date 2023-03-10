@@ -31,6 +31,7 @@ var _ = Describe("Transit Gateways", func() {
 		ctx               context.Context
 		fixture           *acceptance.Fixture
 		prefixListID      string
+		prefixListARN     string
 		rawEC2Client      *ec2.EC2
 		transitGatewayARN string
 		ramClient         *ram.RAM
@@ -63,9 +64,41 @@ var _ = Describe("Transit Gateways", func() {
 	AfterEach(func() {
 		managementCluster := fixture.GetManagementCluster()
 		managementAWSCluster := fixture.GetManagementAWSCluster()
-		clusterIdentity := fixture.GetClusterRoleIdentity()
+		clusterRoleIdentity := fixture.GetClusterRoleIdentity()
 
-		err := k8sClient.Delete(ctx, managementCluster)
+		workloadCluster := fixture.GetWorkloadCluster()
+		workloadAWSCluster := fixture.GetWorkloadAWSCluster()
+		workloadClusterRoleIdentity := fixture.GetWorkloadClusterRoleIdentity()
+
+		err := k8sClient.Delete(ctx, workloadCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		Eventually(func(g Gomega) []string {
+			err := k8sClient.Get(ctx, k8sclient.GetNamespacedName(workloadCluster), workloadCluster)
+			if k8serrors.IsNotFound(err) {
+				return nil
+			}
+			g.Expect(err).NotTo(HaveOccurred())
+			return workloadCluster.Finalizers
+		}).ShouldNot(ContainElement(controllers.FinalizerNetTop))
+
+		err = k8sClient.Delete(ctx, workloadAWSCluster)
+		if !k8serrors.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		err = k8sClient.Delete(ctx, workloadClusterRoleIdentity)
+		if !k8serrors.IsNotFound(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		controllerutil.RemoveFinalizer(workloadCluster, capa.ClusterFinalizer)
+		patchHelper, err := patch.NewHelper(workloadCluster, k8sClient)
+		Expect(err).NotTo(HaveOccurred())
+		err = patchHelper.Patch(ctx, workloadCluster)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = k8sClient.Delete(ctx, managementCluster)
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func(g Gomega) []string {
@@ -82,13 +115,13 @@ var _ = Describe("Transit Gateways", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}
 
-		err = k8sClient.Delete(ctx, clusterIdentity)
+		err = k8sClient.Delete(ctx, clusterRoleIdentity)
 		if !k8serrors.IsNotFound(err) {
 			Expect(err).NotTo(HaveOccurred())
 		}
 
 		controllerutil.RemoveFinalizer(managementCluster, capa.ClusterFinalizer)
-		patchHelper, err := patch.NewHelper(managementCluster, k8sClient)
+		patchHelper, err = patch.NewHelper(managementCluster, k8sClient)
 		Expect(err).NotTo(HaveOccurred())
 		err = patchHelper.Patch(ctx, managementCluster)
 		Expect(err).NotTo(HaveOccurred())
@@ -143,7 +176,7 @@ var _ = Describe("Transit Gateways", func() {
 			cluster := &capi.Cluster{}
 			err := k8sClient.Get(ctx, fixture.GetManagementClusterNamespacedName(), cluster)
 			Expect(err).NotTo(HaveOccurred())
-			prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
+			prefixListARN = annotations.GetNetworkTopologyPrefixList(cluster)
 			if prefixListARN == "" {
 				return ""
 			}
@@ -191,7 +224,7 @@ var _ = Describe("Transit Gateways", func() {
 			}))),
 		}))))
 
-		err = fixture.CreateWCOnAnotherAccount(ctx, k8sClient, rawEC2Client, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListID)
+		err = fixture.CreateWCOnAnotherAccount(ctx, k8sClient, rawEC2Client, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListARN)
 		Expect(err).NotTo(HaveOccurred())
 
 		getResourceShares := func() []*ram.ResourceShare {

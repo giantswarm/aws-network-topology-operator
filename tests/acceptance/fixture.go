@@ -56,12 +56,31 @@ func (f *Fixture) GetWorkloadClusterNamespacedName() types.NamespacedName {
 	return k8sclient.GetNamespacedName(f.workloadCluster)
 }
 
+func (f *Fixture) GetWorkloadCluster() *capi.Cluster {
+	return f.workloadCluster
+}
+
+func (f *Fixture) GetWorkloadAWSClusterNamespacedName() types.NamespacedName {
+	return k8sclient.GetNamespacedName(f.workloadAWSCluster)
+}
+
+func (f *Fixture) GetWorkloadAWSCluster() *capa.AWSCluster {
+	return f.workloadAWSCluster
+}
+
 func (f *Fixture) GetClusterRoleIdentity() *capa.AWSClusterRoleIdentity {
 	return f.managementClusterRoleIdentity
 }
 
 func (f *Fixture) GetVpcID() string {
 	return f.vpcId
+}
+
+func (f *Fixture) GetWorkloadClusterVpcID() string {
+	return f.vpcIdWC
+}
+func (f *Fixture) GetWorkloadClusterRoleIdentity() *capa.AWSClusterRoleIdentity {
+	return f.workloadClusterRoleIdentity
 }
 
 func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2, mcIAMRoleARN, awsRegion, availabilityZone string) error {
@@ -180,7 +199,7 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 	return nil
 }
 
-func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListID string) error {
+func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListARN string) error {
 	createVpcOutput, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
 		CidrBlock: aws.String("172.32.0.0/16"),
 	})
@@ -229,7 +248,7 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 			Annotations: map[string]string{
 				gsannotations.NetworkTopologyModeAnnotation:             gsannotations.NetworkTopologyModeGiantSwarmManaged,
 				gsannotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
-				gsannotations.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+				gsannotations.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
 			},
 		},
 		Spec: capi.ClusterSpec{
@@ -299,14 +318,28 @@ func (f *Fixture) Teardown(ctx context.Context, k8sClient client.Client, rawEC2C
 		SubnetId: aws.String(f.subnetId),
 	})
 	if err != nil {
-		return fmt.Errorf("error while deleting subnets: %w", err)
+		return fmt.Errorf("error while MC deleting subnet: %w", err)
 	}
 
 	_, err = rawEC2Client.DeleteVpc(&ec2.DeleteVpcInput{
 		VpcId: aws.String(f.vpcId),
 	})
 	if err != nil {
-		return fmt.Errorf("error while deleting vpcs: %w", err)
+		return fmt.Errorf("error while MC deleting vpc: %w", err)
+	}
+
+	_, err = rawEC2Client.DeleteSubnet(&ec2.DeleteSubnetInput{
+		SubnetId: aws.String(f.subnetIdWC),
+	})
+	if err != nil {
+		return fmt.Errorf("error while WC deleting subnet: %w", err)
+	}
+
+	_, err = rawEC2Client.DeleteVpc(&ec2.DeleteVpcInput{
+		VpcId: aws.String(f.vpcIdWC),
+	})
+	if err != nil {
+		return fmt.Errorf("error while WC deleting vpc: %w", err)
 	}
 
 	return nil
