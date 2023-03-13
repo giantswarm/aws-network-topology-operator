@@ -4,9 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
+	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ram"
 	gsannotations "github.com/giantswarm/k8smetadata/pkg/annotation"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,7 +23,52 @@ import (
 	"github.com/giantswarm/aws-network-topology-operator/tests"
 )
 
+func NewFixture(k8sClient client.Client) *Fixture {
+	mcAccount := tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
+	wcAccount := tests.GetEnvOrSkip("WC_AWS_ACCOUNT")
+	iamRoleId := tests.GetEnvOrSkip("AWS_IAM_ROLE_ID")
+	awsRegion := tests.GetEnvOrSkip("AWS_REGION")
+
+	session, err := session.NewSession(&awssdk.Config{
+		Region: awssdk.String(awsRegion),
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	mcIAMRoleARN := getRoleARN(mcAccount, iamRoleId)
+
+	ec2Client := ec2.New(session,
+		&awssdk.Config{
+			Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
+		},
+	)
+
+	ramClient := ram.New(session, &awssdk.Config{
+		Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
+	})
+
+	return &Fixture{
+		k8sClient: k8sClient,
+
+		ec2Client: ec2Client,
+		ramClient: ramClient,
+
+		managementAWSAccount: mcAccount,
+		workloadAWSAccount:   wcAccount,
+		awsIAMRoleId:         iamRoleId,
+		awsRegion:            awsRegion,
+	}
+}
+
 type Fixture struct {
+	k8sClient client.Client
+	ec2Client *ec2.EC2
+	ramClient *ram.RAM
+
+	managementAWSAccount string
+	workloadAWSAccount   string
+	awsIAMRoleId         string
+	awsRegion            string
+
 	managementCluster             *capi.Cluster
 	managementAWSCluster          *capa.AWSCluster
 	managementClusterRoleIdentity *capa.AWSClusterRoleIdentity
@@ -79,15 +128,16 @@ func (f *Fixture) GetVpcID() string {
 func (f *Fixture) GetWorkloadClusterVpcID() string {
 	return f.vpcIdWC
 }
+
 func (f *Fixture) GetWorkloadClusterRoleIdentity() *capa.AWSClusterRoleIdentity {
 	return f.workloadClusterRoleIdentity
 }
 
-func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2, mcIAMRoleARN, awsRegion, availabilityZone string) error {
+func (f *Fixture) Setup(ctx context.Context) error {
 	name := tests.GenerateGUID("test")
 
-	createVpcOutput, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock: aws.String("172.64.0.0/16"),
+	createVpcOutput, err := f.ec2Client.CreateVpc(&ec2.CreateVpcInput{
+		CidrBlock: awssdk.String("172.64.0.0/16"),
 	})
 	if err != nil {
 		return fmt.Errorf("error while creating vpc: %w", err)
@@ -95,10 +145,10 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 
 	f.vpcId = *createVpcOutput.Vpc.VpcId
 
-	createSubnetOutput, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
-		CidrBlock:         aws.String("172.64.0.0/20"),
-		VpcId:             aws.String(f.vpcId),
-		AvailabilityZone:  &availabilityZone,
+	createSubnetOutput, err := f.ec2Client.CreateSubnet(&ec2.CreateSubnetInput{
+		CidrBlock:         awssdk.String("172.64.0.0/20"),
+		VpcId:             awssdk.String(f.vpcId),
+		AvailabilityZone:  awssdk.String(getAvailabilityZone(f.awsRegion)),
 		TagSpecifications: generateTagSpecifications(),
 	})
 	if err != nil {
@@ -106,17 +156,17 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 	}
 	f.subnetId = *createSubnetOutput.Subnet.SubnetId
 
-	createRouteTableOutput, err := rawEC2Client.CreateRouteTable(&ec2.CreateRouteTableInput{
-		VpcId: aws.String(f.vpcId),
+	createRouteTableOutput, err := f.ec2Client.CreateRouteTable(&ec2.CreateRouteTableInput{
+		VpcId: awssdk.String(f.vpcId),
 	})
 	if err != nil {
 		return fmt.Errorf("error while creating route table: %w", err)
 	}
 	f.routeTableId = *createRouteTableOutput.RouteTable.RouteTableId
 
-	assocRouteTableOutput, err := rawEC2Client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
-		RouteTableId: aws.String(f.routeTableId),
-		SubnetId:     aws.String(f.subnetId),
+	assocRouteTableOutput, err := f.ec2Client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
+		RouteTableId: awssdk.String(f.routeTableId),
+		SubnetId:     awssdk.String(f.subnetId),
 	})
 	if err != nil {
 		return fmt.Errorf("error while associating route table with subnet: %w", err)
@@ -129,7 +179,7 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 		},
 		Spec: capa.AWSClusterRoleIdentitySpec{
 			AWSRoleSpec: capa.AWSRoleSpec{
-				RoleArn: mcIAMRoleARN,
+				RoleArn: getRoleARN(f.managementAWSAccount, f.awsIAMRoleId),
 			},
 			SourceIdentityRef: &capa.AWSIdentityReference{
 				Name: "default",
@@ -138,7 +188,7 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 		},
 	}
 
-	err = k8sClient.Create(ctx, f.managementClusterRoleIdentity)
+	err = f.k8sClient.Create(ctx, f.managementClusterRoleIdentity)
 	if err != nil {
 		return fmt.Errorf("error while creating AWSClusterRoleIdentity: %w", err)
 	}
@@ -186,12 +236,12 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 		},
 	}
 
-	err = k8sClient.Create(ctx, f.managementCluster)
+	err = f.k8sClient.Create(ctx, f.managementCluster)
 	if err != nil {
 		return fmt.Errorf("error while creating Cluster: %w", err)
 	}
 
-	err = k8sClient.Create(ctx, f.managementAWSCluster)
+	err = f.k8sClient.Create(ctx, f.managementAWSCluster)
 	if err != nil {
 		return fmt.Errorf("error while creating AWSCluster: %w", err)
 	}
@@ -199,9 +249,9 @@ func (f *Fixture) Setup(ctx context.Context, k8sClient client.Client, rawEC2Clie
 	return nil
 }
 
-func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client.Client, rawEC2Client *ec2.EC2, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListARN string) error {
-	createVpcOutput, err := rawEC2Client.CreateVpc(&ec2.CreateVpcInput{
-		CidrBlock: aws.String("172.32.0.0/16"),
+func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context) error {
+	createVpcOutput, err := f.ec2Client.CreateVpc(&ec2.CreateVpcInput{
+		CidrBlock: awssdk.String("172.32.0.0/16"),
 	})
 	if err != nil {
 		return fmt.Errorf("error while creating vpc: %w", err)
@@ -209,10 +259,10 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 
 	f.vpcIdWC = *createVpcOutput.Vpc.VpcId
 
-	createSubnetOutput, err := rawEC2Client.CreateSubnet(&ec2.CreateSubnetInput{
-		CidrBlock:         aws.String("172.32.0.0/20"),
-		VpcId:             aws.String(f.vpcIdWC),
-		AvailabilityZone:  &availabilityZone,
+	createSubnetOutput, err := f.ec2Client.CreateSubnet(&ec2.CreateSubnetInput{
+		CidrBlock:         awssdk.String("172.32.0.0/20"),
+		VpcId:             awssdk.String(f.vpcIdWC),
+		AvailabilityZone:  awssdk.String(getAvailabilityZone(f.awsRegion)),
 		TagSpecifications: generateTagSpecifications(),
 	})
 	if err != nil {
@@ -227,7 +277,7 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 		},
 		Spec: capa.AWSClusterRoleIdentitySpec{
 			AWSRoleSpec: capa.AWSRoleSpec{
-				RoleArn: wcIAMRoleARN,
+				RoleArn: getRoleARN(f.workloadAWSAccount, f.awsIAMRoleId),
 			},
 			SourceIdentityRef: &capa.AWSIdentityReference{
 				Name: "default",
@@ -236,7 +286,7 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 		},
 	}
 
-	err = k8sClient.Create(ctx, f.workloadClusterRoleIdentity)
+	err = f.k8sClient.Create(ctx, f.workloadClusterRoleIdentity)
 	if err != nil {
 		return fmt.Errorf("error while creating AWSClusterRoleIdentity: %w", err)
 	}
@@ -246,9 +296,7 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 			Name:      "test-wc-share",
 			Namespace: "test",
 			Annotations: map[string]string{
-				gsannotations.NetworkTopologyModeAnnotation:             gsannotations.NetworkTopologyModeGiantSwarmManaged,
-				gsannotations.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
-				gsannotations.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
+				gsannotations.NetworkTopologyModeAnnotation: gsannotations.NetworkTopologyModeGiantSwarmManaged,
 			},
 		},
 		Spec: capi.ClusterSpec{
@@ -286,12 +334,12 @@ func (f *Fixture) CreateWCOnAnotherAccount(ctx context.Context, k8sClient client
 		},
 	}
 
-	err = k8sClient.Create(ctx, f.workloadCluster)
+	err = f.k8sClient.Create(ctx, f.workloadCluster)
 	if err != nil {
 		return fmt.Errorf("error while creating Cluster: %w", err)
 	}
 
-	err = k8sClient.Create(ctx, f.workloadAWSCluster)
+	err = f.k8sClient.Create(ctx, f.workloadAWSCluster)
 	if err != nil {
 		return fmt.Errorf("error while creating AWSCluster: %w", err)
 	}
@@ -315,28 +363,28 @@ func (f *Fixture) Teardown(ctx context.Context, k8sClient client.Client, rawEC2C
 	}
 
 	_, err = rawEC2Client.DeleteSubnet(&ec2.DeleteSubnetInput{
-		SubnetId: aws.String(f.subnetId),
+		SubnetId: awssdk.String(f.subnetId),
 	})
 	if err != nil {
 		return fmt.Errorf("error while MC deleting subnet: %w", err)
 	}
 
 	_, err = rawEC2Client.DeleteVpc(&ec2.DeleteVpcInput{
-		VpcId: aws.String(f.vpcId),
+		VpcId: awssdk.String(f.vpcId),
 	})
 	if err != nil {
 		return fmt.Errorf("error while MC deleting vpc: %w", err)
 	}
 
 	_, err = rawEC2Client.DeleteSubnet(&ec2.DeleteSubnetInput{
-		SubnetId: aws.String(f.subnetIdWC),
+		SubnetId: awssdk.String(f.subnetIdWC),
 	})
 	if err != nil {
 		return fmt.Errorf("error while WC deleting subnet: %w", err)
 	}
 
 	_, err = rawEC2Client.DeleteVpc(&ec2.DeleteVpcInput{
-		VpcId: aws.String(f.vpcIdWC),
+		VpcId: awssdk.String(f.vpcIdWC),
 	})
 	if err != nil {
 		return fmt.Errorf("error while WC deleting vpc: %w", err)
@@ -345,21 +393,29 @@ func (f *Fixture) Teardown(ctx context.Context, k8sClient client.Client, rawEC2C
 	return nil
 }
 
+func getRoleARN(account, roleID string) string {
+	return fmt.Sprintf("arn:aws:iam::%s:role/%s", account, roleID)
+}
+
+func getAvailabilityZone(region string) string {
+	return fmt.Sprintf("%sa", region)
+}
+
 func generateTagSpecifications() []*ec2.TagSpecification {
 	tagSpec := &ec2.TagSpecification{
-		ResourceType: aws.String(ec2.ResourceTypeSubnet),
+		ResourceType: awssdk.String(ec2.ResourceTypeSubnet),
 		Tags: []*ec2.Tag{
 			{
-				Key:   aws.String(registrar.SubnetTGWAttachementsLabel),
-				Value: aws.String("true"),
+				Key:   awssdk.String(registrar.SubnetTGWAttachementsLabel),
+				Value: awssdk.String("true"),
 			},
 			{
-				Key:   aws.String(registrar.SubnetRoleLabel),
-				Value: aws.String("private"),
+				Key:   awssdk.String(registrar.SubnetRoleLabel),
+				Value: awssdk.String("private"),
 			},
 			{
-				Key:   aws.String(capa.NameKubernetesAWSCloudProviderPrefix + "test-mc"),
-				Value: aws.String("shared"),
+				Key:   awssdk.String(capa.NameKubernetesAWSCloudProviderPrefix + "test-mc"),
+				Value: awssdk.String("shared"),
 			},
 		},
 	}

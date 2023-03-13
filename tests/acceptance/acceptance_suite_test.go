@@ -2,9 +2,10 @@ package acceptance_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,18 +17,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/aws-network-topology-operator/tests"
+	"github.com/giantswarm/aws-network-topology-operator/tests/acceptance"
 )
 
 var (
 	k8sClient client.Client
 
-	namespace         string
-	namespaceObj      *corev1.Namespace
-	mcIAMRoleARN      string
-	awsRegion         string
-	wcIAMRoleARN      string
-	externalAccountID string
-	availabilityZone  string
+	namespace    string
+	namespaceObj *corev1.Namespace
+
+	ramClient *ram.RAM
+	ec2Client *ec2.EC2
+
+	fixture *acceptance.Fixture
 )
 
 func TestAcceptance(t *testing.T) {
@@ -50,15 +52,7 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 
-	mcAccount := tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
-	wcAccount := tests.GetEnvOrSkip("WC_AWS_ACCOUNT")
-	//wcOtherAccount := tests.GetEnvOrSkip("WC_AWS_ACCOUNT_ORIGINAL")
-	iamRoleId := tests.GetEnvOrSkip("AWS_IAM_ROLE_ID")
-	awsRegion = tests.GetEnvOrSkip("AWS_REGION")
-	availabilityZone = fmt.Sprintf("%sa", awsRegion)
-	mcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", mcAccount, iamRoleId)
-	wcIAMRoleARN = fmt.Sprintf("arn:aws:iam::%s:role/%s", wcAccount, iamRoleId)
-	externalAccountID = tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
+	fixture = acceptance.NewFixture(k8sClient, ec2Client)
 })
 
 var _ = BeforeEach(func() {

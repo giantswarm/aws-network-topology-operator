@@ -6,8 +6,6 @@ import (
 	"time"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ram"
 	. "github.com/onsi/ginkgo/v2"
@@ -41,23 +39,8 @@ var _ = Describe("Transit Gateways", func() {
 		ctx = context.Background()
 		SetDefaultEventuallyPollingInterval(time.Second)
 		SetDefaultEventuallyTimeout(5 * time.Minute)
-		session, err := session.NewSession(&awssdk.Config{
-			Region: awssdk.String(awsRegion),
-		})
-		Expect(err).NotTo(HaveOccurred())
 
-		rawEC2Client = ec2.New(session,
-			&awssdk.Config{
-				Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
-			},
-		)
-
-		ramClient = ram.New(session, &awssdk.Config{
-			Credentials: stscreds.NewCredentials(session, mcIAMRoleARN),
-		})
-
-		fixture = &acceptance.Fixture{}
-		err = fixture.Setup(ctx, k8sClient, rawEC2Client, mcIAMRoleARN, awsRegion, availabilityZone)
+		err := fixture.Setup(ctx)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -224,7 +207,7 @@ var _ = Describe("Transit Gateways", func() {
 			}))),
 		}))))
 
-		err = fixture.CreateWCOnAnotherAccount(ctx, k8sClient, rawEC2Client, wcIAMRoleARN, awsRegion, availabilityZone, transitGatewayARN, prefixListARN)
+		err = fixture.CreateWCOnAnotherAccount(ctx)
 		Expect(err).NotTo(HaveOccurred())
 
 		getResourceShares := func() []*ram.ResourceShare {
