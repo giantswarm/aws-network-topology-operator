@@ -52,7 +52,7 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 
-	fixture = acceptance.NewFixture(k8sClient, ec2Client)
+	fixture = acceptance.NewFixture(k8sClient)
 })
 
 var _ = BeforeEach(func() {
