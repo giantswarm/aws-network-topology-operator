@@ -117,10 +117,14 @@ var _ = Describe("Share", func() {
 		Expect(result.Requeue).To(BeFalse())
 		Expect(err).NotTo(HaveOccurred())
 
-		Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(1))
+		Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(2))
 		_, resourceShare := ramClient.ApplyResourceShareArgsForCall(0)
 		Expect(resourceShare.Name).To(Equal(fmt.Sprintf("%s-transit-gateway", name)))
-		Expect(resourceShare.ResourceArns).To(ConsistOf(transitGatewayARN, prefixListARN))
+		Expect(resourceShare.ResourceArns).To(ConsistOf(transitGatewayARN))
+		Expect(resourceShare.ExternalAccountID).To(Equal(externalAccountID))
+		_, resourceShare = ramClient.ApplyResourceShareArgsForCall(1)
+		Expect(resourceShare.Name).To(Equal(fmt.Sprintf("%s-prefix-list", name)))
+		Expect(resourceShare.ResourceArns).To(ConsistOf(prefixListARN))
 		Expect(resourceShare.ExternalAccountID).To(Equal(externalAccountID))
 	})
 
@@ -166,9 +170,11 @@ var _ = Describe("Share", func() {
 			Expect(result.Requeue).To(BeFalse())
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(ramClient.DeleteResourceShareCallCount()).To(Equal(1))
-			_, actualName := ramClient.DeleteResourceShareArgsForCall(0)
-			Expect(actualName).To(Equal(fmt.Sprintf("%s-transit-gateway", name)))
+			Expect(ramClient.DeleteResourceShareCallCount()).To(Equal(2))
+			_, actualNameTransitGateway := ramClient.DeleteResourceShareArgsForCall(0)
+			Expect(actualNameTransitGateway).To(Equal(fmt.Sprintf("%s-transit-gateway", name)))
+			_, actualNamePrefixList := ramClient.DeleteResourceShareArgsForCall(1)
+			Expect(actualNamePrefixList).To(Equal(fmt.Sprintf("%s-prefix-list", name)))
 		})
 
 		It("removes the finalizer", func() {
@@ -228,25 +234,26 @@ var _ = Describe("Share", func() {
 			Expect(result.Requeue).To(BeFalse())
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(0))
+			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(1))
 		})
 	})
 
 	When("the transit gateway hasn't been created yet", func() {
 		BeforeEach(func() {
 			patchedCluster := cluster.DeepCopy()
-			patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = ""
+			patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = ""
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("does not reconcile", func() {
+		It("still shares the prefix list", func() {
 			result, err := reconciler.Reconcile(ctx, request)
-
-			Expect(result.Requeue).To(BeFalse())
 			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
 
-			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(0))
+			Expect(ramClient.ApplyResourceShareCallCount()).To(Equal(1))
+			_, resourceShare := ramClient.ApplyResourceShareArgsForCall(0)
+			Expect(resourceShare.ResourceArns).To(ConsistOf(prefixListARN))
 		})
 	})
 

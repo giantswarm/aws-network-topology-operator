@@ -77,7 +77,13 @@ func (r *ShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
 	logger := r.getLogger(ctx)
 
-	err := r.ramClient.DeleteResourceShare(ctx, getResourceShareName(cluster))
+	err := r.ramClient.DeleteResourceShare(ctx, getResourceShareName(cluster, "transit-gateway"))
+	if err != nil {
+		logger.Error(err, "failed to apply resource share")
+		return ctrl.Result{}, err
+	}
+
+	err = r.ramClient.DeleteResourceShare(ctx, getResourceShareName(cluster, "prefix-list"))
 	if err != nil {
 		logger.Error(err, "failed to apply resource share")
 		return ctrl.Result{}, err
@@ -93,60 +99,18 @@ func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capi.Clu
 }
 
 func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
-	logger := r.getLogger(ctx)
-
-	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(cluster)
-
-	if transitGatewayAnnotation == "" {
-		logger.Info("transit gateway arn annotation not set yet")
-		return ctrl.Result{}, nil
-	}
-
-	prefixListAnnotation := annotations.GetNetworkTopologyPrefixList(cluster)
-
-	if prefixListAnnotation == "" {
-		logger.Info("prefix list arn annotation not set yet")
-		return ctrl.Result{}, nil
-	}
-
-	transitGatewayARN, err := arn.Parse(transitGatewayAnnotation)
-	if err != nil {
-		logger.Error(err, "failed to parse transit gateway arn", "Annotation", transitGatewayAnnotation)
-		return ctrl.Result{}, err
-	}
-
-	prefixListARN, err := arn.Parse(prefixListAnnotation)
-	if err != nil {
-		logger.Error(err, "failed to parse prefix list arn", "Annotation", prefixListAnnotation)
-		return ctrl.Result{}, err
-	}
-
 	accountID, err := r.getAccountId(ctx, cluster)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if accountID == transitGatewayARN.AccountID {
-		logger.Info("transit gateway in same account as cluster, there is no need to share it using ram. Skipping")
-		return ctrl.Result{}, nil
-	}
-
-	err = r.clusterClient.AddFinalizer(ctx, cluster, FinalizerResourceShare)
+	err = r.shareTransitGateway(ctx, cluster, accountID)
 	if err != nil {
-		logger.Error(err, "failed to add finalizer")
 		return ctrl.Result{}, err
 	}
 
-	err = r.ramClient.ApplyResourceShare(ctx, aws.ResourceShare{
-		Name: getResourceShareName(cluster),
-		ResourceArns: []string{
-			transitGatewayARN.String(),
-			prefixListARN.String(),
-		},
-		ExternalAccountID: accountID,
-	})
+	err = r.sharePrefixList(ctx, cluster, accountID)
 	if err != nil {
-		logger.Error(err, "failed to apply resource share")
 		return ctrl.Result{}, err
 	}
 
@@ -181,6 +145,85 @@ func (r *ShareReconciler) getLogger(ctx context.Context) logr.Logger {
 	return logger
 }
 
-func getResourceShareName(cluster *capi.Cluster) string {
-	return fmt.Sprintf("%s-transit-gateway", cluster.Name)
+func getResourceShareName(cluster *capi.Cluster, resourceName string) string {
+	return fmt.Sprintf("%s-%s", cluster.Name, resourceName)
+}
+
+func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster *capi.Cluster, accountID string) error {
+	logger := r.getLogger(ctx)
+	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(cluster)
+
+	if transitGatewayAnnotation == "" {
+		logger.Info("transit gateway arn annotation not set yet")
+		return nil
+	}
+
+	logger = logger.WithValues("Annotation", transitGatewayAnnotation)
+
+	transitGatewayARN, err := arn.Parse(transitGatewayAnnotation)
+	if err != nil {
+		logger.Error(err, "failed to parse transit gateway arn")
+		return err
+	}
+
+	if accountID == transitGatewayARN.AccountID {
+		logger.Info("transit gateway in same account as cluster, there is no need to share it using ram. Skipping")
+		return nil
+	}
+
+	err = r.clusterClient.AddFinalizer(ctx, cluster, FinalizerResourceShare)
+	if err != nil {
+		logger.Error(err, "failed to add finalizer")
+		return err
+	}
+
+	err = r.ramClient.ApplyResourceShare(ctx, aws.ResourceShare{
+		Name: getResourceShareName(cluster, "transit-gateway"),
+		ResourceArns: []string{
+			transitGatewayARN.String(),
+		},
+		ExternalAccountID: accountID,
+	})
+	if err != nil {
+		logger.Error(err, "failed to apply resource share")
+		return err
+	}
+
+	return nil
+}
+
+func (r *ShareReconciler) sharePrefixList(ctx context.Context, cluster *capi.Cluster, accountID string) error {
+	logger := r.getLogger(ctx)
+	prefixListAnnotation := annotations.GetNetworkTopologyPrefixList(cluster)
+	if prefixListAnnotation == "" {
+		logger.Info("prefix list arn annotation not set yet")
+		return nil
+	}
+
+	logger = logger.WithValues("Annotation", prefixListAnnotation)
+
+	prefixListARN, err := arn.Parse(prefixListAnnotation)
+	if err != nil {
+		logger.Error(err, "failed to parse prefix list arn", "Annotation", prefixListAnnotation)
+		return err
+	}
+
+	if accountID == prefixListARN.AccountID {
+		logger.Info("prefix list in same account as cluster, there is no need to share it using ram. Skipping")
+		return nil
+	}
+
+	err = r.ramClient.ApplyResourceShare(ctx, aws.ResourceShare{
+		Name: getResourceShareName(cluster, "prefix-list"),
+		ResourceArns: []string{
+			prefixListARN.String(),
+		},
+		ExternalAccountID: accountID,
+	})
+	if err != nil {
+		logger.Error(err, "failed to apply resource share")
+		return err
+	}
+
+	return nil
 }
