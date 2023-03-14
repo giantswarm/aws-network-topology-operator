@@ -42,7 +42,7 @@ var _ = Describe("RAM client", func() {
 	}
 
 	BeforeEach(func() {
-		SetDefaultEventuallyTimeout(5 * time.Second)
+		SetDefaultEventuallyTimeout(10 * time.Second)
 		SetDefaultConsistentlyPollingInterval(100 * time.Millisecond)
 
 		ctx = log.IntoContext(context.Background(), logger)
