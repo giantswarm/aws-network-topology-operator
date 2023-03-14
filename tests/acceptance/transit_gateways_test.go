@@ -180,7 +180,7 @@ var _ = Describe("Transit Gateways", func() {
 			"Description": PointTo(Equal(prefixListDescription)),
 		}))))
 
-		checkRouteTables := func() []*ec2.RouteTable {
+		getRouteTables := func() []*ec2.RouteTable {
 			subnets := []*string{}
 			for _, s := range managementAWSCluster.Spec.NetworkSpec.Subnets {
 				subnets = append(subnets, awssdk.String(s.ID))
@@ -196,7 +196,7 @@ var _ = Describe("Transit Gateways", func() {
 
 			return routeTablesOutput.RouteTables
 		}
-		Eventually(checkRouteTables).Should(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
+		Eventually(getRouteTables).Should(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
 			"Routes": ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
 				"DestinationPrefixListId": PointTo(Equal(prefixListID)),
 				"TransitGatewayId":        PointTo(Equal(transitGatewayID)),
@@ -206,15 +206,20 @@ var _ = Describe("Transit Gateways", func() {
 		workloadCluster, err := fixture.CreateWorkloadCluster()
 		Expect(err).NotTo(HaveOccurred())
 
-		getResourceShares := func() []*ram.ResourceShare {
-			resourceShare, err := fixture.RamClient.GetResourceShares(&ram.GetResourceSharesInput{
-				Name:          awssdk.String(fmt.Sprintf("%s-transit-gateway", workloadCluster.GetCluster().Name)),
-				ResourceOwner: awssdk.String("SELF"),
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(resourceShare).NotTo(BeNil())
-			return resourceShare.ResourceShares
+		getResourceShares := func(name string) func() []*ram.ResourceShare {
+			return func() []*ram.ResourceShare {
+				resourceShare, err := fixture.RamClient.GetResourceShares(&ram.GetResourceSharesInput{
+					Name:          awssdk.String(name),
+					ResourceOwner: awssdk.String("SELF"),
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceShare).NotTo(BeNil())
+				return resourceShare.ResourceShares
+			}
 		}
-		Eventually(getResourceShares).Should(HaveLen(1))
+		transitGatewayShareName := fmt.Sprintf("%s-transit-gateway", workloadCluster.Name())
+		Eventually(getResourceShares(transitGatewayShareName)).Should(HaveLen(1))
+		prefixListShareName := fmt.Sprintf("%s-prefix-list", workloadCluster.Name())
+		Eventually(getResourceShares(prefixListShareName)).Should(HaveLen(1))
 	})
 })

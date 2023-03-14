@@ -146,6 +146,10 @@ func (c *Cluster) GetCluster() *capi.Cluster {
 	return c.cluster
 }
 
+func (c *Cluster) Name() string {
+	return c.cluster.Name
+}
+
 func (c *Cluster) GetAWSClusterNamespacedName() types.NamespacedName {
 	return k8sclient.GetNamespacedName(c.awsCluster)
 }
@@ -153,6 +157,7 @@ func (c *Cluster) GetAWSClusterNamespacedName() types.NamespacedName {
 func (c *Cluster) GetAWSCluster() *capa.AWSCluster {
 	return c.awsCluster
 }
+
 func (c *Cluster) GetClusterRoleIdentity() *capa.AWSClusterRoleIdentity {
 	return c.clusterRoleIdentity
 }
@@ -276,7 +281,6 @@ func (c *Cluster) Setup(config *Config, k8sClient client.Client, ec2Client *ec2.
 }
 
 func (c *Cluster) Teardown(k8sClient client.Client, ec2Client *ec2.EC2) error {
-
 	_, err := ec2Client.DisassociateRouteTable(&ec2.DisassociateRouteTableInput{
 		AssociationId: &c.AssocitationID,
 	})
