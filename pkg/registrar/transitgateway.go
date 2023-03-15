@@ -411,8 +411,15 @@ func (r *TransitGateway) getOrCreateTransitGateway(ctx context.Context, gatewayI
 func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *string, awsCluster *capa.AWSCluster) (*types.TransitGatewayVpcAttachment, error) {
 	logger := r.getLogger(ctx)
 
+	// Attachments from VPC to the transit gateway need to be made from the AWS account
+	// of the workload cluster, so we use a separate client
+	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
+		Name:      awsCluster.ObjectMeta.Name,
+		Namespace: awsCluster.ObjectMeta.Namespace,
+	})
+
 	vpcID := awsCluster.Spec.NetworkSpec.VPC.ID
-	subnets, err := r.getTGWGAttachmentSubnetsOrDefault(ctx, awsCluster)
+	subnets, err := r.getTGWGAttachmentSubnetsOrDefault(ctx, transitGatewayAttachmentClient, awsCluster)
 	if err != nil {
 		logger.Error(err, "Failed to get subnets for transit gateway attachment", "transitGatewayID", gatewayID)
 		return nil, err
@@ -423,13 +430,6 @@ func (r *TransitGateway) attachTransitGateway(ctx context.Context, gatewayID *st
 		logger.Error(err, "AWSCluster does not yet have network details available")
 		return nil, err
 	}
-
-	// Attachments from VPC to the transit gateway need to be made from the AWS account
-	// of the workload cluster, so we use a separate client
-	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
-		Name:      awsCluster.ObjectMeta.Name,
-		Namespace: awsCluster.ObjectMeta.Namespace,
-	})
 
 	describeTGWattachmentInput := &ec2.DescribeTransitGatewayVpcAttachmentsInput{
 		Filters: []types.Filter{
@@ -595,7 +595,13 @@ func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefix
 		subnets = append(subnets, s.ID)
 	}
 
-	output, err := r.transitGatewayClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+	// Creation of routes need to be made from the AWS account of the workload cluster
+	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
+		Name:      awsCluster.ObjectMeta.Name,
+		Namespace: awsCluster.ObjectMeta.Namespace,
+	})
+
+	output, err := transitGatewayAttachmentClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
 			{Name: aws.String("association.subnet-id"), Values: subnets},
 		},
@@ -618,7 +624,7 @@ func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefix
 				continue
 			}
 
-			_, err = r.transitGatewayClient.CreateRoute(ctx, &ec2.CreateRouteInput{
+			_, err = transitGatewayAttachmentClient.CreateRoute(ctx, &ec2.CreateRouteInput{
 				RouteTableId:            rt.RouteTableId,
 				DestinationPrefixListId: prefixListID,
 				TransitGatewayId:        transitGatewayID,
@@ -654,7 +660,13 @@ func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSC
 		subnets = append(subnets, s.ID)
 	}
 
-	output, err := r.transitGatewayClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
+	// Creation of routes need to be made from the AWS account of the workload cluster
+	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
+		Name:      awsCluster.ObjectMeta.Name,
+		Namespace: awsCluster.ObjectMeta.Namespace,
+	})
+
+	output, err := transitGatewayAttachmentClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
 			{Name: aws.String("association.subnet-id"), Values: subnets},
 		},
@@ -666,7 +678,7 @@ func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSC
 
 	if output != nil && len(output.RouteTables) > 0 {
 		for _, rt := range output.RouteTables {
-			_, err = r.transitGatewayClient.DeleteRoute(ctx, &ec2.DeleteRouteInput{
+			_, err = transitGatewayAttachmentClient.DeleteRoute(ctx, &ec2.DeleteRouteInput{
 				RouteTableId:            rt.RouteTableId,
 				DestinationPrefixListId: &prefixListID,
 			})
@@ -777,9 +789,9 @@ func (r *TransitGateway) removeFromPrefixList(ctx context.Context, awsCluster *c
 
 // Search subnets with expected attachment, if there are not any
 // choose first one per AZ
-func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, awsCluster *capa.AWSCluster) ([]string, error) {
+func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, transitGatewayClient awsclient.TransitGatewayClient, awsCluster *capa.AWSCluster) ([]string, error) {
 	result := make([]string, 0)
-	output, err := r.transitGatewayClient.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+	output, err := transitGatewayClient.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
 		Filters: []types.Filter{
 			{Name: aws.String("tag:" + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
 			{Name: aws.String("tag:" + SubnetTGWAttachementsLabel), Values: []string{"true"}},
@@ -809,7 +821,6 @@ func getPrivateSubnetsByAZ(subnets capa.Subnets) []string {
 	azMap := make(map[string]bool)
 	result := make([]string, 0)
 	for _, subnet := range subnets {
-
 		if !subnet.IsPublic {
 			if !azMap[subnet.AvailabilityZone] {
 				result = append(result, subnet.ID)
