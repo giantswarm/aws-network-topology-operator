@@ -3,6 +3,8 @@ apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
   name: {{ include "resource.psp.name" . }}
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
   labels:
     {{- include "labels.common" . | nindent 4 }}
 spec:
@@ -23,6 +25,11 @@ spec:
     rule: RunAsAny
   supplementalGroups:
     rule: RunAsAny
+  volumes:
+    # Used directly in deployment
+    - secret
+    # Needed for Kubernetes API access (https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/)
+    - projected
   allowPrivilegeEscalation: false
   hostNetwork: false
   hostIPC: false
