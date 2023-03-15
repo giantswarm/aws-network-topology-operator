@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Change client used to create/delete routes.
 
+## [1.4.3] - 2023-03-15
+
+### Added
+
+- Added the use of the runtime/default seccomp profile
+
 ## [1.4.2] - 2023-02-16
 
 ### Fixed
@@ -253,7 +259,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.3...HEAD
+[1.4.3]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.3.0...v1.4.0
