@@ -161,7 +161,10 @@ var _ = Describe("Share", func() {
 			controllerutil.AddFinalizer(patchedCluster, controllers.FinalizerResourceShare)
 			err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
 			Expect(err).NotTo(HaveOccurred())
-			err = k8sClient.Delete(ctx, patchedCluster)
+		})
+
+		JustBeforeEach(func() {
+			err := k8sClient.Delete(ctx, cluster)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -216,6 +219,24 @@ var _ = Describe("Share", func() {
 			It("returns an error", func() {
 				_, err := reconciler.Reconcile(ctx, request)
 				Expect(err).To(MatchError(ContainSubstring("boom")))
+			})
+		})
+
+		When("the cluster still has the networktopology finalizer", func() {
+			BeforeEach(func() {
+				patchedCluster := cluster.DeepCopy()
+				controllerutil.AddFinalizer(patchedCluster, controllers.FinalizerNetTop)
+				err := k8sClient.Patch(context.Background(), patchedCluster, client.MergeFrom(cluster))
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("does not reconcile", func() {
+				result, err := reconciler.Reconcile(ctx, request)
+
+				Expect(result.Requeue).To(BeFalse())
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(ramClient.DeleteResourceShareCallCount()).To(Equal(0))
 			})
 		})
 	})

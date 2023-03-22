@@ -77,6 +77,11 @@ func (r *ShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
 	logger := r.getLogger(ctx)
 
+	if r.clusterClient.ContainsFinalizer(cluster, FinalizerNetTop) {
+		logger.Info("Transit gateway and prefix list not yet cleaned up. Skipping...")
+		return ctrl.Result{}, nil
+	}
+
 	err := r.ramClient.DeleteResourceShare(ctx, getResourceShareName(cluster, "transit-gateway"))
 	if err != nil {
 		logger.Error(err, "failed to apply resource share")
