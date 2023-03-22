@@ -2,10 +2,9 @@ package acceptance_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/ram"
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/aws-network-topology-operator/tests"
-	"github.com/giantswarm/aws-network-topology-operator/tests/acceptance"
+	"github.com/giantswarm/aws-network-topology-operator/tests/acceptance/fixture"
 )
 
 var (
@@ -26,10 +25,7 @@ var (
 	namespace    string
 	namespaceObj *corev1.Namespace
 
-	ramClient *ram.RAM
-	ec2Client *ec2.EC2
-
-	fixture *acceptance.Fixture
+	testFixture *fixture.Fixture
 )
 
 func TestAcceptance(t *testing.T) {
@@ -52,7 +48,21 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 
-	fixture = acceptance.NewFixture(k8sClient)
+	awsAccount := tests.GetEnvOrSkip("MC_AWS_ACCOUNT")
+	iamRoleID := tests.GetEnvOrSkip("AWS_IAM_ROLE_ID")
+	awsRegion := tests.GetEnvOrSkip("AWS_REGION")
+	managementClusterName := tests.GetEnvOrSkip("MANAGEMENT_CLUSTER_NAME")
+	managementClusterNamespace := tests.GetEnvOrSkip("MANAGEMENT_CLUSTER_NAMESPACE")
+	roleARN := fmt.Sprintf("arn:aws:iam::%s:role/%s", awsAccount, iamRoleID)
+
+	fixtureConfig := fixture.Config{
+		AWSAccount:                 awsAccount,
+		AWSIAMRoleARN:              roleARN,
+		AWSRegion:                  awsRegion,
+		ManagementClusterName:      managementClusterName,
+		ManagementClusterNamespace: managementClusterNamespace,
+	}
+	testFixture = fixture.NewFixture(k8sClient, fixtureConfig)
 })
 
 var _ = BeforeEach(func() {
