@@ -54,6 +54,8 @@ workflows:
           resource_class: xlarge
           requires:
             - unit-tests
+            - integration-tests
+            - acceptance-tests
           filters:
             tags:
               only: /^v.*/
