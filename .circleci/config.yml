@@ -10,11 +10,33 @@ jobs:
       - run:
           name: "Run unit tests"
           command: CGO_ENABLED=0 make test-unit
+  integration-tests:
+    executor: architect/architect
+    steps:
+      - checkout
+      - run:
+          name: "Run integration tests"
+          command: CGO_ENABLED=0 make test-integration
+  acceptance-tests:
+    executor: architect/architect
+    steps:
+      - checkout
+      - run:
+          name: "Run acceptance tests"
+          command: CGO_ENABLED=0 make test-acceptance
 
 workflows:
   test-and-push:
     jobs:
       - unit-tests:
+          filters:
+            tags:
+              only: /^v.*/
+      - integration-tests:
+          filters:
+            tags:
+              only: /^v.*/
+      - acceptance-tests:
           filters:
             tags:
               only: /^v.*/
