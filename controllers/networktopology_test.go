@@ -873,6 +873,25 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
 
+		When("the transit gateway annotation contains an ID", func() {
+			BeforeEach(func() {
+				cluster := &capi.Cluster{}
+				err := k8sClient.Get(ctx, request.NamespacedName, cluster)
+				Expect(err).NotTo(HaveOccurred())
+
+				patchedCluster := cluster.DeepCopy()
+				patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = transitGatewayID
+				Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
+			})
+
+			It("sets the annotation to the arn", func() {
+				actualCluster := &capi.Cluster{}
+				err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]).To(Equal(transitGatewayARN))
+			})
+		})
+
 		When("the cluster is a Management Cluster", func() {
 			When("the cluster is new", func() {
 				BeforeEach(func() {
@@ -1127,6 +1146,25 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 				It("should not create routes on subnet route tables", func() {
 					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(0))
+				})
+
+				When("the prefix list annotation contains an ID", func() {
+					BeforeEach(func() {
+						cluster := &capi.Cluster{}
+						err := k8sClient.Get(ctx, request.NamespacedName, cluster)
+						Expect(err).NotTo(HaveOccurred())
+
+						patchedCluster := cluster.DeepCopy()
+						patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = prefixListID
+						Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
+					})
+
+					It("sets the annotation to the arn", func() {
+						actualCluster := &capi.Cluster{}
+						err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(actualCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation]).To(Equal(prefixListARN))
+					})
 				})
 			})
 

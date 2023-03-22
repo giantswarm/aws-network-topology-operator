@@ -736,12 +736,12 @@ func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSC
 
 	if output != nil && len(output.RouteTables) > 0 {
 		for _, rt := range output.RouteTables {
-			var routeDeletionError smithy.APIError
 			_, err = transitGatewayAttachmentClient.DeleteRoute(ctx, &ec2.DeleteRouteInput{
 				RouteTableId:            rt.RouteTableId,
 				DestinationPrefixListId: &prefixListID,
 			})
 			if err != nil {
+				var routeDeletionError smithy.APIError
 				if errors.As(err, &routeDeletionError) {
 					if routeDeletionError.ErrorCode() == ErrRouteNotFound {
 						logger.Info("Route to delete is not present, skipping...")
@@ -901,19 +901,35 @@ func buildEntryDescription(awsCluster *capa.AWSCluster) string {
 }
 
 func getTransitGatewayID(cluster *capi.Cluster) (string, error) {
-	gatewayARNAnnotation := annotations.GetNetworkTopologyTransitGateway(cluster)
-	if gatewayARNAnnotation == "" {
+	gatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(cluster)
+	if gatewayAnnotation == "" {
 		return "", nil
 	}
 
-	return aws.GetARNResourceID(gatewayARNAnnotation)
+	// For migration purposes we allow the transit gateway annotation to either
+	// contain an ARN or the ID. If we can't parse the arn we assume that an ID
+	// is provided. We always save the ARN later
+	transitGatewayID, err := aws.GetARNResourceID(gatewayAnnotation)
+	if err != nil {
+		return gatewayAnnotation, nil
+	}
+
+	return transitGatewayID, nil
 }
 
 func getPrefixListID(cluster *capi.Cluster) (string, error) {
-	prefixListARN := annotations.GetNetworkTopologyPrefixList(cluster)
-	if prefixListARN == "" {
+	prefixListAnnoation := annotations.GetNetworkTopologyPrefixList(cluster)
+	if prefixListAnnoation == "" {
 		return "", nil
 	}
 
-	return aws.GetARNResourceID(prefixListARN)
+	// For migration purposes we allow the prefix list annotation to either
+	// contain an ARN or the ID. If we can't parse the arn we assume that an ID
+	// is provided. We always save the ARN later
+	prefixListID, err := aws.GetARNResourceID(prefixListAnnoation)
+	if err != nil {
+		return prefixListAnnoation, nil
+	}
+
+	return prefixListID, nil
 }
