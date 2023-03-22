@@ -47,7 +47,7 @@ clear-envtest-cache: ## Clear envtest ports cache
 
 .PHONY: test-unit
 test-unit: ginkgo generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --cover -r -randomize-all --randomize-suites --skip-package=tests ./...
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 4 --cover -r -randomize-all --randomize-suites --skip-package=tests ./...
 
 .PHONY: start-localstack
 start-localstack: docker-compose ## Run localstack with docker-compose
@@ -59,7 +59,7 @@ stop-localstack: docker-compose ## Run localstack with docker-compose
 
 .PHONY: test-integration
 test-integration: ginkgo ## Run integration tests
-	$(GINKGO) -p -r -randomize-all --randomize-suites tests/integration/
+	$(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites tests/integration/
 
 .PHONY: run-acceptance-tests
 run-acceptance-tests: KUBECONFIG=$(HOME)/.kube/$(CLUSTER).yml
