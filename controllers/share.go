@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws/arn"
-	"github.com/go-logr/logr"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -41,12 +40,13 @@ func NewShareReconciler(clusterClient ClusterClient, ramClient RAMClient) *Share
 
 func (r *ShareReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("share-reconciler").
 		For(&capi.Cluster{}).
 		Complete(r)
 }
 
 func (r *ShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := r.getLogger(ctx)
+	logger := log.FromContext(ctx)
 
 	logger.Info("Reconciling")
 	defer logger.Info("Done reconciling")
@@ -75,7 +75,7 @@ func (r *ShareReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 }
 
 func (r *ShareReconciler) reconcileDelete(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
-	logger := r.getLogger(ctx)
+	logger := log.FromContext(ctx)
 
 	if r.clusterClient.ContainsFinalizer(cluster, FinalizerNetTop) {
 		logger.Info("Transit gateway and prefix list not yet cleaned up. Skipping...")
@@ -109,6 +109,10 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 		return ctrl.Result{}, err
 	}
 
+	// We need to share the transit gateway separately from the prefix list, as
+	// the networktopology reconciler needs to attach the transit gateway
+	// first, before moving on to creating the prefix list. If the transit
+	// gateway isn't shared it won't be visible in the WC's account
 	err = r.shareTransitGateway(ctx, cluster, accountID)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -123,7 +127,7 @@ func (r *ShareReconciler) reconcileNormal(ctx context.Context, cluster *capi.Clu
 }
 
 func (r *ShareReconciler) getAccountId(ctx context.Context, cluster *capi.Cluster) (string, error) {
-	logger := r.getLogger(ctx)
+	logger := log.FromContext(ctx)
 	awsCluster := types.NamespacedName{
 		Name:      cluster.Spec.InfrastructureRef.Name,
 		Namespace: cluster.Spec.InfrastructureRef.Namespace,
@@ -144,18 +148,12 @@ func (r *ShareReconciler) getAccountId(ctx context.Context, cluster *capi.Cluste
 	return roleArn.AccountID, nil
 }
 
-func (r *ShareReconciler) getLogger(ctx context.Context) logr.Logger {
-	logger := log.FromContext(ctx)
-	logger = logger.WithName("share-reconciler")
-	return logger
-}
-
 func getResourceShareName(cluster *capi.Cluster, resourceName string) string {
 	return fmt.Sprintf("%s-%s", cluster.Name, resourceName)
 }
 
 func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster *capi.Cluster, accountID string) error {
-	logger := r.getLogger(ctx)
+	logger := log.FromContext(ctx)
 	transitGatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(cluster)
 
 	if transitGatewayAnnotation == "" {
@@ -198,7 +196,7 @@ func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster *capi
 }
 
 func (r *ShareReconciler) sharePrefixList(ctx context.Context, cluster *capi.Cluster, accountID string) error {
-	logger := r.getLogger(ctx)
+	logger := log.FromContext(ctx)
 	prefixListAnnotation := annotations.GetNetworkTopologyPrefixList(cluster)
 	if prefixListAnnotation == "" {
 		logger.Info("prefix list arn annotation not set yet")

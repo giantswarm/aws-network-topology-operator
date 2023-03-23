@@ -2,7 +2,6 @@ package registrar
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -10,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/smithy-go"
 	"github.com/giantswarm/k8smetadata/pkg/annotation"
 	"github.com/go-logr/logr"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,7 +67,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 	ctx = context.WithValue(ctx, clusterNameContextKey, cluster.ObjectMeta.Name)
 	logger := r.getLogger(ctx)
 
-	gatewayID, err := getTransitGatewayID(cluster)
+	gatewayID, err := getTransitGatewayID(logger, cluster)
 	if err != nil {
 		return err
 	}
@@ -120,7 +118,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 					return err
 				}
 
-				gatewayID, err = getTransitGatewayID(mc)
+				gatewayID, err = getTransitGatewayID(logger, mc)
 				if err != nil {
 					return err
 				}
@@ -211,7 +209,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 					return err
 				}
 
-				gatewayID, err = getTransitGatewayID(mc)
+				gatewayID, err = getTransitGatewayID(logger, mc)
 				if err != nil {
 					return err
 				}
@@ -290,7 +288,7 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) error {
 	logger := r.getLogger(ctx)
 
-	gatewayID, err := getTransitGatewayID(cluster)
+	gatewayID, err := getTransitGatewayID(logger, cluster)
 	if err != nil {
 		return err
 	}
@@ -590,7 +588,7 @@ func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context) (*types.Mana
 		return nil, err
 	}
 
-	prefixListID, err := getPrefixListID(mc)
+	prefixListID, err := getPrefixListID(logger, mc)
 	if err != nil {
 		logger.Error(err, "Failed to get prefix list id from cluster")
 		return nil, err
@@ -741,12 +739,9 @@ func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSC
 				DestinationPrefixListId: &prefixListID,
 			})
 			if err != nil {
-				var routeDeletionError smithy.APIError
-				if errors.As(err, &routeDeletionError) {
-					if routeDeletionError.ErrorCode() == ErrRouteNotFound {
-						logger.Info("Route to delete is not present, skipping...")
-						continue
-					}
+				if aws.HasErrorCode(err, ErrRouteNotFound) {
+					logger.Info("Route to delete is not present, skipping...")
+					continue
 				}
 				logger.Error(err, "Failed to remove route from route table", "routeTableID", rt.RouteTableId, "prefixListID", prefixListID)
 				return err
@@ -900,7 +895,7 @@ func buildEntryDescription(awsCluster *capa.AWSCluster) string {
 	return fmt.Sprintf("CIDR block for cluster %s", awsCluster.Name)
 }
 
-func getTransitGatewayID(cluster *capi.Cluster) (string, error) {
+func getTransitGatewayID(logger logr.Logger, cluster *capi.Cluster) (string, error) {
 	gatewayAnnotation := annotations.GetNetworkTopologyTransitGateway(cluster)
 	if gatewayAnnotation == "" {
 		return "", nil
@@ -911,13 +906,14 @@ func getTransitGatewayID(cluster *capi.Cluster) (string, error) {
 	// is provided. We always save the ARN later
 	transitGatewayID, err := aws.GetARNResourceID(gatewayAnnotation)
 	if err != nil {
+		logger.Info("Failed to parse transit gateway ARN, assuming ID is provided")
 		return gatewayAnnotation, nil
 	}
 
 	return transitGatewayID, nil
 }
 
-func getPrefixListID(cluster *capi.Cluster) (string, error) {
+func getPrefixListID(logger logr.Logger, cluster *capi.Cluster) (string, error) {
 	prefixListAnnoation := annotations.GetNetworkTopologyPrefixList(cluster)
 	if prefixListAnnoation == "" {
 		return "", nil
@@ -928,6 +924,7 @@ func getPrefixListID(cluster *capi.Cluster) (string, error) {
 	// is provided. We always save the ARN later
 	prefixListID, err := aws.GetARNResourceID(prefixListAnnoation)
 	if err != nil {
+		logger.Info("Failed to parse prefix list ARN, assuming ID is provided")
 		return prefixListAnnoation, nil
 	}
 
