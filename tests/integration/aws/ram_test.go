@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ram"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gstruct"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/aws-network-topology-operator/pkg/aws"
@@ -39,6 +40,37 @@ var _ = Describe("RAM client", func() {
 		})
 		g.Expect(err).NotTo(HaveOccurred())
 		return listResourcesOutput.Resources
+	}
+
+	getResourceAssociationStatus := func(g Gomega) *string {
+		listAssociationsOutput, err := rawRamClient.GetResourceShareAssociations(&ram.GetResourceShareAssociationsInput{
+			AssociationType: awssdk.String(ram.ResourceShareAssociationTypeResource),
+			ResourceArn:     prefixList.PrefixListArn,
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(listAssociationsOutput.ResourceShareAssociations).To(HaveLen(1))
+		return listAssociationsOutput.ResourceShareAssociations[0].Status
+	}
+
+	getPrincipalAssociationStatus := func(g Gomega) *string {
+		getResourceShareOutput, err := rawRamClient.GetResourceShares(&ram.GetResourceSharesInput{
+			Name:          awssdk.String(name),
+			ResourceOwner: awssdk.String(aws.ResourceOwnerSelf),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(getResourceShareOutput.ResourceShares).To(HaveLen(1))
+
+		resourceShare := getResourceShareOutput.ResourceShares[0]
+		listAssociationsOutput, err := rawRamClient.GetResourceShareAssociations(&ram.GetResourceShareAssociationsInput{
+			AssociationType:   awssdk.String(ram.ResourceShareAssociationTypePrincipal),
+			Principal:         awssdk.String(wcAccount),
+			ResourceShareArns: []*string{resourceShare.ResourceShareArn},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(listAssociationsOutput.ResourceShareAssociations).To(HaveLen(1))
+		return listAssociationsOutput.ResourceShareAssociations[0].Status
 	}
 
 	BeforeEach(func() {
@@ -93,11 +125,6 @@ var _ = Describe("RAM client", func() {
 
 	Describe("ApplyResourceShare", func() {
 		It("creates the share resource", func() {
-			share := aws.ResourceShare{
-				Name:              name,
-				ResourceArns:      []string{*prefixList.PrefixListArn},
-				ExternalAccountID: wcAccount,
-			}
 			err := ramClient.ApplyResourceShare(ctx, share)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -160,14 +187,15 @@ var _ = Describe("RAM client", func() {
 
 	Describe("DeleteResourceShare", func() {
 		BeforeEach(func() {
-			share := aws.ResourceShare{
-				Name:              name,
-				ResourceArns:      []string{*prefixList.PrefixListArn},
-				ExternalAccountID: wcAccount,
-			}
 			err := ramClient.ApplyResourceShare(ctx, share)
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(getSharedResources).Should(HaveLen(1))
+
+			// The resource share can only be deleted when the resource and
+			// principal are in a final state like Associated. If we don't
+			// wait for this state the tests will flake
+			Eventually(getResourceAssociationStatus).Should(PointTo(Equal(ram.ResourceShareAssociationStatusAssociated)))
+			Eventually(getPrincipalAssociationStatus).Should(PointTo(Equal(ram.ResourceShareAssociationStatusAssociated)))
 		})
 
 		It("deletes the resource share", func() {
@@ -188,6 +216,29 @@ var _ = Describe("RAM client", func() {
 			It("does not return an error", func() {
 				err := ramClient.DeleteResourceShare(ctx, name)
 				Expect(err).NotTo(HaveOccurred())
+			})
+
+			When("creating a resource share with the same name", func() {
+				It("creates the share resource", func() {
+					Consistently(getSharedResources).Should(HaveLen(0))
+
+					err := ramClient.ApplyResourceShare(ctx, share)
+					Expect(err).NotTo(HaveOccurred())
+
+					Eventually(getSharedResources).Should(HaveLen(1))
+				})
+
+				When("the resource has already been recreated", func() {
+					BeforeEach(func() {
+						err := ramClient.ApplyResourceShare(ctx, share)
+						Expect(err).NotTo(HaveOccurred())
+					})
+
+					It("does not return an error", func() {
+						err := ramClient.ApplyResourceShare(ctx, share)
+						Expect(err).NotTo(HaveOccurred())
+					})
+				})
 			})
 		})
 	})

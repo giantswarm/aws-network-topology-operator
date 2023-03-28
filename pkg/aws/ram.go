@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -34,16 +33,13 @@ func (c *RAMClient) ApplyResourceShare(ctx context.Context, share ResourceShare)
 	logger := c.getLogger(ctx)
 	logger = logger.WithValues("resource-share-name", share.Name, "resource-arns", share.ResourceArns)
 
-	resourceShare, err := c.ramClient.GetResourceShares(&ram.GetResourceSharesInput{
-		Name:          aws.String(share.Name),
-		ResourceOwner: aws.String(ResourceOwnerSelf),
-	})
+	resourceShare, err := c.getResourceShare(ctx, share.Name)
 	if err != nil {
 		logger.Error(err, "failed to get resource share")
 		return errors.WithStack(err)
 	}
 
-	if len(resourceShare.ResourceShares) != 0 {
+	if resourceShare != nil {
 		logger.Info("resource share already exists")
 		return nil
 	}
@@ -55,7 +51,6 @@ func (c *RAMClient) ApplyResourceShare(ctx context.Context, share ResourceShare)
 		Principals:              []*string{awssdk.String(share.ExternalAccountID)},
 		ResourceArns:            awssdk.StringSlice(share.ResourceArns),
 	})
-
 	if err != nil {
 		logger.Error(err, "failed to create resource share")
 		return err
@@ -89,7 +84,7 @@ func (c *RAMClient) getResourceShare(ctx context.Context, name string) (*ram.Res
 	logger := c.getLogger(ctx)
 	logger = logger.WithValues("resource-share-name", name)
 
-	resourceShare, err := c.ramClient.GetResourceShares(&ram.GetResourceSharesInput{
+	resourceShareOutput, err := c.ramClient.GetResourceShares(&ram.GetResourceSharesInput{
 		Name:          awssdk.String(name),
 		ResourceOwner: awssdk.String(ResourceOwnerSelf),
 	})
@@ -98,19 +93,20 @@ func (c *RAMClient) getResourceShare(ctx context.Context, name string) (*ram.Res
 		return nil, errors.WithStack(err)
 	}
 
-	resourceShareCount := len(resourceShare.ResourceShares)
+	resourceShares := filterDeletedResourceShares(resourceShareOutput.ResourceShares)
 
-	if resourceShareCount == 0 {
+	if len(resourceShares) == 0 {
 		logger.Info("no resource shares found")
 		return nil, nil
 	}
 
-	if len(resourceShare.ResourceShares) > 1 {
-		logger.Info("wrong number of resource shares", "resource-shares-found", len(resourceShare.ResourceShares))
-		return nil, fmt.Errorf("expected 1 resource share, found %d", resourceShareCount)
+	if len(resourceShares) > 1 {
+		err = fmt.Errorf("expected 1 resource share, found %d", len(resourceShares))
+		logger.Error(err, "wrong number of resource shares")
+		return nil, err
 	}
 
-	return resourceShare.ResourceShares[0], nil
+	return resourceShares[0], nil
 }
 
 func (c *RAMClient) getLogger(ctx context.Context) logr.Logger {
@@ -132,4 +128,24 @@ func configureExternalId(roleArn, externalId string) func(provider *stscreds.Ass
 			assumeRoleProvider.ExternalID = awssdk.String(externalId)
 		}
 	}
+}
+
+func filterDeletedResourceShares(resourceShares []*ram.ResourceShare) []*ram.ResourceShare {
+	filtered := []*ram.ResourceShare{}
+	for _, share := range resourceShares {
+		if !isResourceShareDeleted(share) {
+			filtered = append(filtered, share)
+		}
+	}
+
+	return filtered
+}
+
+func isResourceShareDeleted(resourceShare *ram.ResourceShare) bool {
+	if resourceShare.Status == nil {
+		return false
+	}
+
+	status := *resourceShare.Status
+	return status == ram.ResourceShareStatusDeleted || status == ram.ResourceShareStatusDeleting
 }
