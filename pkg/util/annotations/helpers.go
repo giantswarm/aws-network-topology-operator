@@ -21,23 +21,23 @@ func IsNetworkTopologyModeNone(o metav1.Object) bool {
 	return GetAnnotation(o, gsannotation.NetworkTopologyModeAnnotation) == gsannotation.NetworkTopologyModeNone
 }
 
-func GetNetworkTopologyTransitGatewayID(o metav1.Object) string {
+func GetNetworkTopologyTransitGateway(o metav1.Object) string {
 	return GetAnnotation(o, gsannotation.NetworkTopologyTransitGatewayIDAnnotation)
 }
 
-func GetNetworkTopologyPrefixListID(o metav1.Object) string {
+func GetNetworkTopologyPrefixList(o metav1.Object) string {
 	return GetAnnotation(o, gsannotation.NetworkTopologyPrefixListIDAnnotation)
 }
 
-func SetNetworkTopologyTransitGatewayID(o metav1.Object, transitGatewayID string) {
+func SetNetworkTopologyTransitGateway(o metav1.Object, transitGatewayID string) {
 	AddAnnotations(o, map[string]string{
 		gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
 	})
 }
 
-func SetNetworkTopologyPrefixListID(o metav1.Object, prefixListID string) {
+func SetNetworkTopologyPrefixList(o metav1.Object, prefixList string) {
 	AddAnnotations(o, map[string]string{
-		gsannotation.NetworkTopologyPrefixListIDAnnotation: prefixListID,
+		gsannotation.NetworkTopologyPrefixListIDAnnotation: prefixList,
 	})
 }
 

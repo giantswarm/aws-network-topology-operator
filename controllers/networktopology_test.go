@@ -44,10 +44,12 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		transitGatewayClient                   *awsfakes.FakeTransitGatewayClient
 		transitGatewayClientForWorkloadCluster *awsfakes.FakeTransitGatewayClient
 
-		transitGatewayID = "abc-123"
-		prefixListID     = "prefix-123"
-		mcVPCId          = "vpc-123"
-		wcVPCId          = "vpc-987"
+		transitGatewayID  = "abc-123"
+		transitGatewayARN = fmt.Sprintf("arn:aws:iam::123456789012:transit-gateways/%s", transitGatewayID)
+		prefixListID      = "prefix-123"
+		prefixListARN     = fmt.Sprintf("arn:aws:iam::123456789012:prefix-lists/%s", prefixListID)
+		mcVPCId           = "vpc-123"
+		wcVPCId           = "vpc-987"
 
 		cluster    *capi.Cluster
 		awsCluster *capa.AWSCluster
@@ -60,7 +62,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		reconcileErr error
 	)
 
-	var newCluster = func(name, namespace string, annotations map[string]string, vpcID string) (*capi.Cluster, *capa.AWSCluster) {
+	newCluster := func(name, namespace string, annotations map[string]string, vpcID string) (*capi.Cluster, *capa.AWSCluster) {
 		awsCluster := &capa.AWSCluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        name,
@@ -205,7 +207,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Name:      mc.Name,
 					Namespace: mc.Namespace,
 					Annotations: map[string]string{
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 					},
 				},
 				Spec: capi.ClusterSpec{
@@ -251,7 +253,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 	When("the cluster doesn't have the topology mode annotation", func() {
 		BeforeEach(func() {
-
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
 				[]controllers.Registrar{
@@ -343,7 +344,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				&ec2.DescribeTransitGatewaysOutput{
 					TransitGateways: []awstypes.TransitGateway{
 						{
-							TransitGatewayId: &transitGatewayID,
+							TransitGatewayArn: &transitGatewayARN,
+							TransitGatewayId:  &transitGatewayID,
 						},
 					},
 				},
@@ -374,7 +376,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			patchedCluster.Finalizers = []string{controllers.FinalizerNetTop}
 			patchedCluster.Annotations = map[string]string{
 				gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-				gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+				gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 				gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 			}
 			Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
@@ -393,7 +395,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(actualMode).To(Equal(gsannotation.NetworkTopologyModeUserManaged))
 
 			actualID := actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]
-			Expect(actualID).To(Equal(transitGatewayID))
+			Expect(actualID).To(Equal(transitGatewayARN))
 		})
 
 		It("does requeue the event", func() {
@@ -408,7 +410,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
@@ -420,8 +422,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					&ec2.DescribeTransitGatewaysOutput{
 						TransitGateways: []awstypes.TransitGateway{
 							{
-								TransitGatewayId: &transitGatewayID,
-								State:            awstypes.TransitGatewayStateAvailable,
+								TransitGatewayArn: &transitGatewayARN,
+								TransitGatewayId:  &transitGatewayID,
+								State:             awstypes.TransitGatewayStateAvailable,
 							},
 						},
 					},
@@ -550,7 +553,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					wcVPCId,
@@ -560,7 +563,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
@@ -572,8 +575,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					&ec2.DescribeTransitGatewaysOutput{
 						TransitGateways: []awstypes.TransitGateway{
 							{
-								TransitGatewayId: &transitGatewayID,
-								State:            awstypes.TransitGatewayStateAvailable,
+								TransitGatewayArn: &transitGatewayARN,
+								TransitGatewayId:  &transitGatewayID,
+								State:             awstypes.TransitGatewayStateAvailable,
 							},
 						},
 					},
@@ -706,7 +710,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
-						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
 					},
 					mcVPCId,
@@ -718,8 +722,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					&ec2.DescribeTransitGatewaysOutput{
 						TransitGateways: []awstypes.TransitGateway{
 							{
-								TransitGatewayId: &transitGatewayID,
-								State:            awstypes.TransitGatewayStateAvailable,
+								TransitGatewayArn: &transitGatewayARN,
+								TransitGatewayId:  &transitGatewayID,
+								State:             awstypes.TransitGatewayStateAvailable,
 							},
 						},
 					},
@@ -793,9 +798,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			It("should create routes on subnet route tables", func() {
 				Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(1))
 			})
-
 		})
-
 	})
 
 	When("the cluster topology mode annotation is set to 'GiantSwarmManaged'", func() {
@@ -806,7 +809,8 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				&ec2.DescribeTransitGatewaysOutput{
 					TransitGateways: []awstypes.TransitGateway{
 						{
-							TransitGatewayId: &transitGatewayID,
+							TransitGatewayArn: &transitGatewayARN,
+							TransitGatewayId:  &transitGatewayID,
 						},
 					},
 				},
@@ -860,7 +864,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			actualID := actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]
-			Expect(actualID).To(Equal(transitGatewayID))
+			Expect(actualID).To(Equal(transitGatewayARN))
 		})
 
 		It("does requeue the event", func() {
@@ -869,8 +873,26 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			Expect(reconcileErr).NotTo(HaveOccurred())
 		})
 
-		When("the cluster is a Management Cluster", func() {
+		When("the transit gateway annotation contains an ID", func() {
+			BeforeEach(func() {
+				cluster := &capi.Cluster{}
+				err := k8sClient.Get(ctx, request.NamespacedName, cluster)
+				Expect(err).NotTo(HaveOccurred())
 
+				patchedCluster := cluster.DeepCopy()
+				patchedCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation] = transitGatewayID
+				Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
+			})
+
+			It("sets the annotation to the arn", func() {
+				actualCluster := &capi.Cluster{}
+				err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(actualCluster.Annotations[gsannotation.NetworkTopologyTransitGatewayIDAnnotation]).To(Equal(transitGatewayARN))
+			})
+		})
+
+		When("the cluster is a Management Cluster", func() {
 			When("the cluster is new", func() {
 				BeforeEach(func() {
 					mcCluster, mcAWSCluster := newCluster(
@@ -893,8 +915,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.CreateTransitGatewayReturns(
 						&ec2.CreateTransitGatewayOutput{
 							TransitGateway: &awstypes.TransitGateway{
-								TransitGatewayId: &transitGatewayID,
-								State:            awstypes.TransitGatewayStateAvailable,
+								TransitGatewayArn: &transitGatewayARN,
+								TransitGatewayId:  &transitGatewayID,
+								State:             awstypes.TransitGatewayStateAvailable,
 							},
 						},
 						nil,
@@ -908,8 +931,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.CreateManagedPrefixListReturns(
 						&ec2.CreateManagedPrefixListOutput{
 							PrefixList: &awstypes.ManagedPrefixList{
-								PrefixListId: &prefixListID,
-								Version:      aws.Int64(1),
+								PrefixListId:  &prefixListID,
+								PrefixListArn: &prefixListARN,
+								Version:       aws.Int64(1),
 							},
 						},
 						nil,
@@ -1012,7 +1036,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1023,8 +1047,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1034,7 +1059,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1118,6 +1147,25 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 				It("should not create routes on subnet route tables", func() {
 					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(0))
 				})
+
+				When("the prefix list annotation contains an ID", func() {
+					BeforeEach(func() {
+						cluster := &capi.Cluster{}
+						err := k8sClient.Get(ctx, request.NamespacedName, cluster)
+						Expect(err).NotTo(HaveOccurred())
+
+						patchedCluster := cluster.DeepCopy()
+						patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = prefixListID
+						Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
+					})
+
+					It("sets the annotation to the arn", func() {
+						actualCluster := &capi.Cluster{}
+						err := k8sClient.Get(ctx, request.NamespacedName, actualCluster)
+						Expect(err).NotTo(HaveOccurred())
+						Expect(actualCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation]).To(Equal(prefixListARN))
+					})
+				})
 			})
 
 			When("the cluster has an existing transit gateway and existing attachment", func() {
@@ -1126,7 +1174,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1137,8 +1185,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1148,7 +1197,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1224,7 +1277,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1235,8 +1288,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1246,7 +1300,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1303,9 +1361,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(k8sClient.Delete(ctx, mcCluster)).To(Succeed())
 				})
 
-				It("detach the transit gateway attachment but not the management cluster's transit gateway", func() {
+				It("detach the transit gateway attachment and deletes the transit gateway", func() {
 					Expect(transitGatewayClient.CreateTransitGatewayCallCount()).To(Equal(0))
-					Expect(transitGatewayClient.DeleteTransitGatewayCallCount()).To(Equal(0))
+					Expect(transitGatewayClient.DeleteTransitGatewayCallCount()).To(Equal(1))
 
 					// Management vs. workload cluster AWS account
 					Expect(transitGatewayClient.DeleteTransitGatewayVpcAttachmentCallCount()).To(Equal(0))
@@ -1329,7 +1387,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1340,8 +1398,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1351,7 +1410,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1431,7 +1494,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					}))
 					Expect(*payload.VpcId).To(Equal(wcVPCId))
 				})
-
 			})
 
 			When("the cluster has an existing transit gateway but no attachment", func() {
@@ -1440,7 +1502,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						wcVPCId,
 					)
@@ -1449,7 +1511,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1460,8 +1522,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1471,7 +1534,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1559,7 +1626,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						wcVPCId,
 					)
@@ -1568,7 +1635,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1579,8 +1646,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1590,7 +1658,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1707,7 +1779,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(reconcileErr.Error()).To(ContainSubstring("management cluster doesn't have a TGW specified"))
 					Expect(result.Requeue).To(BeTrue())
 				})
-
 			})
 
 			When("the a transit gateway matching the ID doesn't exist", func() {
@@ -1716,7 +1787,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("wc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: "not-exist",
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						wcVPCId,
 					)
@@ -1785,7 +1856,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						fmt.Sprintf("mc-cluster-%d", GinkgoParallelProcess()), namespace,
 						map[string]string{
 							gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeGiantSwarmManaged,
-							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayID,
+							gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
 						},
 						mcVPCId,
 					)
@@ -1796,8 +1867,9 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						&ec2.DescribeTransitGatewaysOutput{
 							TransitGateways: []awstypes.TransitGateway{
 								{
-									TransitGatewayId: &transitGatewayID,
-									State:            awstypes.TransitGatewayStateAvailable,
+									TransitGatewayArn: &transitGatewayARN,
+									TransitGatewayId:  &transitGatewayID,
+									State:             awstypes.TransitGatewayStateAvailable,
 								},
 							},
 						},
@@ -1807,7 +1879,11 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					transitGatewayClient.DescribeManagedPrefixListsReturns(
 						&ec2.DescribeManagedPrefixListsOutput{
 							PrefixLists: []awstypes.ManagedPrefixList{
-								{PrefixListId: &prefixListID, Version: aws.Int64(1)},
+								{
+									PrefixListId:  &prefixListID,
+									PrefixListArn: &prefixListARN,
+									Version:       aws.Int64(1),
+								},
 							},
 						},
 						nil,
@@ -1928,6 +2004,5 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 			Expect(fakeRegistrar.UnregisterCallCount()).To(Equal(0))
 		})
-
 	})
 })

@@ -4,9 +4,9 @@ set -euo pipefail
 
 readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly REPO_ROOT="${SCRIPT_DIR}/.."
-readonly CLUSTER=${CLUSTER:-"aws-network-topology-operator-acceptance"}
-readonly KIND="${REPO_ROOT}/bin/kind"
-readonly IMG=${IMG:-quay.io/giantswarm/aws-network-topology-operator:latest}
+readonly KIND="${KIND:?kind binary path not exported}"
+readonly CLUSTER="${CLUSTER:?cluster not exported}"
+readonly IMG="${IMG:?image not exported}"
 
 ensure_kind_cluster() {
   local cluster

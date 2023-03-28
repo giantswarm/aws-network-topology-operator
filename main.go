@@ -28,6 +28,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"github.com/aws/aws-sdk-go/aws/session"
 	gocache "github.com/patrickmn/go-cache"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,6 +37,7 @@ import (
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -109,9 +111,18 @@ func main() {
 		Namespace: managementClusterNamespace,
 	}
 	client := k8sclient.NewCluster(mgr.GetClient(), managementCluster)
+	// Since share reconciler should work on MC account, region from credentials can be directly used.
+	session := session.Must(session.NewSession())
 
 	ec2Service := aws.NewEC2Client(ctx, client, managementCluster)
 	snsService := aws.NewSNSClient(ctx, snsTopic, client, managementCluster)
+
+	identity, err := getAwsClusterRoleIdentity(managementCluster)
+	if err != nil {
+		setupLog.Error(err, "unable to get AWS Cluster Role Identity for management cluster")
+		os.Exit(1)
+	}
+	ramService := aws.NewRAMClient(aws.AwsRamClientFromARN(session, identity.Spec.RoleArn, identity.Spec.ExternalID))
 
 	// Cache EC2 clients to avoid lots of credential requests due to client recreation
 	expiration := 5 * time.Minute
@@ -147,6 +158,12 @@ func main() {
 		setupLog.Error(err, "failed to setup controller", "controller", "Cluster")
 		os.Exit(1)
 	}
+	shareController := controllers.NewShareReconciler(client, ramService)
+	err = shareController.SetupWithManager(mgr)
+	if err != nil {
+		setupLog.Error(err, "failed to setup controller", "controller", "Share")
+		os.Exit(1)
+	}
 
 	// +kubebuilder:scaffold:builder
 
@@ -164,4 +181,30 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func getAwsClusterRoleIdentity(managementCluster types.NamespacedName) (*capa.AWSClusterRoleIdentity, error) {
+	ctx := context.Background()
+	identity := &capa.AWSClusterRoleIdentity{}
+	cluster := &capa.AWSCluster{}
+
+	clientConfig, err := ctrl.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	ctrlClient, err := ctrlclient.New(clientConfig, ctrlclient.Options{Scheme: scheme})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ctrlClient.Get(ctx, managementCluster, cluster); err != nil {
+		return nil, err
+	}
+
+	err = ctrlClient.Get(ctx, types.NamespacedName{Name: cluster.Spec.IdentityRef.Name}, identity)
+	if err != nil {
+		return nil, err
+	}
+	return identity, nil
 }

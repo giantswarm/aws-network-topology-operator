@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= docker.io/giantswarm/aws-network-topology-operator:dev
+IMG ?= quay.io/giantswarm/aws-network-topology-operator:dev
 
 # Substitute colon with space - this creates a list.
 # Word selects the n-th element of the list
@@ -10,9 +10,21 @@ IMAGE_TAG = $(word 2,$(subst :, ,$(IMG)))
 CLUSTER ?= acceptance
 MANAGEMENT_CLUSTER_NAME ?= test-mc
 MANAGEMENT_CLUSTER_NAMESPACE ?= test
-
-
+ 
 ##@ Development
+
+.PHONY: ensure-deploy-envs
+ensure-deploy-envs:
+ifndef AWS_ACCESS_KEY_ID
+	$(error AWS_ACCESS_KEY_ID is undefined)
+endif
+ifndef AWS_SECRET_ACCESS_KEY
+	$(error AWS_SECRET_ACCESS_KEY is undefined)
+endif
+ifndef AWS_REGION
+	$(error AWS_REGION is undefined)
+endif
+
 
 .PHONY: lint-imports
 lint-imports: goimports ## Run go vet against code.
@@ -20,11 +32,11 @@ lint-imports: goimports ## Run go vet against code.
 
 .PHONY: create-acceptance-cluster
 create-acceptance-cluster: kind
-	CLUSTER=$(CLUSTER) IMG=$(IMG) MANAGEMENT_CLUSTER_NAMESPACE=$(MANAGEMENT_CLUSTER_NAMESPACE) ./scripts/ensure-kind-cluster.sh
+	KIND=$(KIND) CLUSTER=$(CLUSTER) IMG=$(IMG) MANAGEMENT_CLUSTER_NAMESPACE=$(MANAGEMENT_CLUSTER_NAMESPACE) ./scripts/ensure-kind-cluster.sh
 
 .PHONY: install-cluster-api
 install-cluster-api: clusterctl
-	$(CLUSTERCTL) init --kubeconfig "$(KUBECONFIG)" --infrastructure=aws --wait-providers || true
+	AWS_B64ENCODED_CREDENTIALS="" $(CLUSTERCTL) init --kubeconfig "$(KUBECONFIG)" --infrastructure=aws --wait-providers || true
 
 .PHONY: deploy-acceptance-cluster
 deploy-acceptance-cluster: docker-build create-acceptance-cluster install-cluster-api deploy
@@ -37,17 +49,30 @@ clear-envtest-cache: ## Clear envtest ports cache
 test-unit: ginkgo generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 4 --cover -r -randomize-all --randomize-suites --skip-package=tests ./...
 
-.PHONY: test-integration
-test-integration: ginkgo envtest ## Run integration tests
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GINKGO) -p --nodes 8 -r -randomize-all --randomize-suites --slow-spec-threshold "30s" tests/integration/
+.PHONY: start-localstack
+start-localstack: docker-compose ## Run localstack with docker-compose
+	$(DOCKER_COMPOSE) up --detach --wait
 
-.PHONY: test-acceptance
-test-acceptance: KUBECONFIG=$(HOME)/.kube/$(CLUSTER).yml
-test-acceptance: ginkgo deploy-acceptance-cluster ## Run acceptance testst
+.PHONY: stop-localstack
+stop-localstack: docker-compose ## Run localstack with docker-compose
+	$(DOCKER_COMPOSE) stop
+
+.PHONY: test-integration
+test-integration: ginkgo ## Run integration tests
+	$(GINKGO) -p --nodes 4 -r -randomize-all --randomize-suites tests/integration/
+
+.PHONY: run-acceptance-tests
+run-acceptance-tests: KUBECONFIG=$(HOME)/.kube/$(CLUSTER).yml
+run-acceptance-tests:
 	KUBECONFIG="$(KUBECONFIG)" \
 	MANAGEMENT_CLUSTER_NAME="$(MANAGEMENT_CLUSTER_NAME)" \
 	MANAGEMENT_CLUSTER_NAMESPACE="$(MANAGEMENT_CLUSTER_NAMESPACE)" \
-	$(GINKGO) -r -randomize-all --randomize-suites --slow-spec-threshold "30s" tests/acceptance
+	$(GINKGO) -r -randomize-all --randomize-suites tests/acceptance
+
+.PHONY: test-acceptance
+test-acceptance: KUBECONFIG=$(HOME)/.kube/$(CLUSTER).yml
+test-acceptance: ginkgo deploy-acceptance-cluster run-acceptance-tests## Run acceptance testst
+
 
 .PHONY: test-all
 test-all: lint lint-imports test-unit test-integration test-acceptance ## Run all tests and litner
@@ -69,8 +94,11 @@ deploy: manifests render ensure-deploy-envs ## Deploy controller to the K8s clus
 	KUBECONFIG=$(KUBECONFIG) helm upgrade --install \
 		--namespace giantswarm \
 		--set image.tag=$(IMAGE_TAG) \
-		--set managementClusterName=$(MANAGEMENT_CLUSTER_NAME) \
-		--set managementClusterNamespace=$(MANAGEMENT_CLUSTER_NAMESPACE) \
+		--set managementCluster.name=$(MANAGEMENT_CLUSTER_NAME) \
+		--set managementCluster.namespace=$(MANAGEMENT_CLUSTER_NAMESPACE) \
+		--set aws.accessKeyID=$(AWS_ACCESS_KEY_ID) \
+		--set aws.secretAccessKey=$(AWS_SECRET_ACCESS_KEY) \
+		--set aws.region=$(AWS_REGION) \
 		--wait \
 		aws-network-topology-operator helm/rendered/aws-network-topology-operator
 
@@ -124,9 +152,15 @@ goimports: ## Download kind locally if necessary.
 CLUSTERCTL = $(shell pwd)/bin/clusterctl
 .PHONY: clusterctl
 clusterctl: ## Download clusterctl locally if necessary.
-	$(eval LATEST_RELEASE = $(shell curl -s https://api.github.com/repos/kubernetes-sigs/cluster-api/releases/latest | jq -r '.tag_name'))
-	curl -sL "https://github.com/kubernetes-sigs/cluster-api/releases/download/$(LATEST_RELEASE)/clusterctl-linux-amd64" -o $(CLUSTERCTL)
-	chmod +x $(CLUSTERCTL)
+	$(call go-get-tool,$(CLUSTERCTL),sigs.k8s.io/cluster-api/cmd/clusterctl@latest)
+
+DOCKER_COMPOSE = $(shell pwd)/bin/docker-compose
+.PHONY: docker-compose
+docker-compose: ## Download docker-compose locally if necessary.
+	$(eval LATEST_RELEASE = $(shell curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name'))
+	curl -sL "https://github.com/docker/compose/releases/download/$(LATEST_RELEASE)/docker-compose-linux-x86_64" -o $(DOCKER_COMPOSE)
+	chmod +x $(DOCKER_COMPOSE)
+
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

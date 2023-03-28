@@ -10,11 +10,40 @@ jobs:
       - run:
           name: "Run unit tests"
           command: CGO_ENABLED=0 make test-unit
+  integration-tests:
+    executor: architect/architect
+    steps:
+      - checkout
+      - run:
+          name: "Run integration tests"
+          command: CGO_ENABLED=0 make test-integration
+  acceptance-tests:
+    executor: architect/machine
+    machine:
+      image: 'ubuntu-2004:202010-01'
+    steps:
+      - checkout
+      - architect/machine-install-go
+      - architect/integration-test-install-tools:
+          apptestctl-version: v0.14.5
+          helm-version: v3.10.2
+          kubernetes-version: v1.25.0
+      - run:
+          name: "Run acceptance tests"
+          command: CGO_ENABLED=0 make test-acceptance
 
 workflows:
   test-and-push:
     jobs:
       - unit-tests:
+          filters:
+            tags:
+              only: /^v.*/
+      - integration-tests:
+          filters:
+            tags:
+              only: /^v.*/
+      - acceptance-tests:
           filters:
             tags:
               only: /^v.*/
@@ -25,6 +54,8 @@ workflows:
           resource_class: xlarge
           requires:
             - unit-tests
+            - integration-tests
+            - acceptance-tests
           filters:
             tags:
               only: /^v.*/
