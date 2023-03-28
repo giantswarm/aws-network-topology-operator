@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add acceptance tests.
+- Save ARNs instead of IDs in the annotations.
 - Add transit gateway share reconciler.
 
 ## [1.4.4] - 2023-03-15
