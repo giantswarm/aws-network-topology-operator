@@ -10,6 +10,7 @@ import (
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gstruct"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -377,7 +378,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 			patchedCluster.Annotations = map[string]string{
 				gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
 				gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
-				gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+				gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
 			}
 			Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
 
@@ -411,7 +412,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
 						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
-						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
 					},
 					mcVPCId,
 				)
@@ -554,7 +555,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
 						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
-						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
 					},
 					wcVPCId,
 				)
@@ -564,7 +565,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
 						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
-						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
 					},
 					mcVPCId,
 				)
@@ -675,6 +676,10 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 				It("should create routes on subnet route tables", func() {
 					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(1))
+					_, input, _ := transitGatewayClientForWorkloadCluster.CreateRouteArgsForCall(0)
+					Expect(input.DestinationPrefixListId).To(PointTo(Equal(prefixListID)))
+					Expect(input.TransitGatewayId).To(PointTo(Equal(transitGatewayID)))
+					Expect(input.RouteTableId).To(PointTo(Equal("rt-123")))
 				})
 
 				It("should not send the SNS message", func() {
@@ -711,7 +716,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					map[string]string{
 						gsannotation.NetworkTopologyModeAnnotation:             gsannotation.NetworkTopologyModeUserManaged,
 						gsannotation.NetworkTopologyTransitGatewayIDAnnotation: transitGatewayARN,
-						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListID,
+						gsannotation.NetworkTopologyPrefixListIDAnnotation:     prefixListARN,
 					},
 					mcVPCId,
 				)
@@ -1155,7 +1160,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 						Expect(err).NotTo(HaveOccurred())
 
 						patchedCluster := cluster.DeepCopy()
-						patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = prefixListID
+						patchedCluster.Annotations[gsannotation.NetworkTopologyPrefixListIDAnnotation] = prefixListARN
 						Expect(k8sClient.Patch(ctx, patchedCluster, client.MergeFrom(cluster))).To(Succeed())
 					})
 
