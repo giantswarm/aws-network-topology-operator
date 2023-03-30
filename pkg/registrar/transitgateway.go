@@ -95,7 +95,11 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 		var err error
 		var tgw *types.TransitGateway
 
-		prefixListID := annotations.GetNetworkTopologyPrefixList(cluster)
+		prefixListID, err := getPrefixListID(logger, cluster)
+		if err != nil {
+			return err
+		}
+
 		if prefixListID == "" {
 			return &IDNotProvidedError{ID: "PrefixList"}
 		}
