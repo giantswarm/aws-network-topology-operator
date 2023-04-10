@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Support prefix list ARN and ID in UserManaged mode.
+- Reduce amount of flakes in integration tests
 
 ## [1.5.0] - 2023-03-28
 
