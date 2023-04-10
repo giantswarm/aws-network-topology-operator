@@ -111,7 +111,7 @@ func getPrincipalAssociationStatus(resourceShareName string) func(g Gomega) *str
 		Expect(err).NotTo(HaveOccurred())
 		resourceShares := []*ram.ResourceShare{}
 		for _, share := range getResourceShareOutput.ResourceShares {
-			if *share.Status != ram.ResourceShareStatusDeleted && *share.Status != ram.ResourceShareStatusDeleting {
+			if !isResourceShareDeleted(share) {
 				resourceShares = append(resourceShares, share)
 			}
 		}
