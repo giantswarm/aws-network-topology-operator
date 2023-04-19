@@ -3,7 +3,7 @@ project:
   commit: "[[ .SHA ]]"
 
 image:
-  registry: quay.io
+  registry: docker.io
   name: giantswarm/aws-network-topology-operator
   tag: "[[ .Version ]]"
   pullPolicy: IfNotPresent
