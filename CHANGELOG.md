@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2023-04-20
+
 ### Changed
 
 - Change default registry in Helm chart from quay.io to docker.io.
@@ -279,7 +281,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.2...v1.4.3
