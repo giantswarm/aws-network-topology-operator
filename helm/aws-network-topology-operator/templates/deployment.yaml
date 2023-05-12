@@ -22,6 +22,11 @@ spec:
       securityContext:
         runAsUser: {{ .Values.pod.user.id }}
         runAsGroup: {{ .Values.pod.group.id }}
+        capabilities:
+          drop:
+          - ALL
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
       terminationGracePeriodSeconds: 10
       containers:
         - name: {{ .Chart.Name }}
