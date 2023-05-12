@@ -4,4 +4,4 @@ sonatype-2022-6522
 # Ignoring pkg:golang/golang.org/x/net@v0.5.0 (indirect dependency)
 CVE-2022-41723 until=2023-06-25
 # CVE in k8s.io/apiserver still not fixed
-CVE-2020-8561 until=2023-04-30
+CVE-2020-8561 until=2023-06-30
