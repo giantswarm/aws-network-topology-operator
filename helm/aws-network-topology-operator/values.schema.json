@@ -77,7 +77,8 @@
                     }
                 },
                 "runAsNonRoot": {
-                    "type": "boolean"  
+                    "type": "boolean", 
+                    "default": true
                 }
             }
         },
@@ -107,7 +108,11 @@
                     "type": "object",
                     "properties": {
                         "drop": {
-                            "type": "array"
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "default": ["ALL"]
                         }
                     }
                 }
