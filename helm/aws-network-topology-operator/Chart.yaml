@@ -9,4 +9,4 @@ appVersion: "[[ .AppVersion ]]"
 home: https://github.com/giantswarm/aws-network-topology-operator
 
 annotations:
-  application.giantswarm.io/team: hydra
+  application.giantswarm.io/team: phoenix
