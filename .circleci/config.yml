@@ -20,7 +20,7 @@ jobs:
   acceptance-tests:
     executor: architect/machine
     machine:
-      image: 'ubuntu-2004:202010-01'
+      image: 'ubuntu-2004:2023.04.2'
     steps:
       - checkout
       - architect/machine-install-go
