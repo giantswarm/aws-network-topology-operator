@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [1.7.0] - 2023-07-14
+
+### Fixed
 
 - Add necessary values for PSS policy warnings.
 
@@ -285,7 +287,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Helm chart
 
-[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/giantswarm/aws-network-topology-operator/compare/v1.4.3...v1.4.4
