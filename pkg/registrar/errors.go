@@ -6,7 +6,6 @@ import (
 )
 
 type ModeNotSupportedError struct {
-	error
 	err  string
 	Mode string
 }
@@ -20,7 +19,6 @@ func (e *ModeNotSupportedError) Is(target error) bool {
 }
 
 type TransitGatewayNotAvailableError struct {
-	error
 }
 
 func (e *TransitGatewayNotAvailableError) Error() string {
@@ -32,7 +30,6 @@ func (e *TransitGatewayNotAvailableError) Is(target error) bool {
 }
 
 type VPCNotReadyError struct {
-	error
 }
 
 func (e *VPCNotReadyError) Error() string {
