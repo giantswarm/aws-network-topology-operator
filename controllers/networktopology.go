@@ -42,14 +42,14 @@ type Registrar interface {
 }
 
 type NetworkTopologyReconciler struct {
-	client     ClusterClient
-	registrars []Registrar
+	client    ClusterClient
+	registrar Registrar
 }
 
-func NewNetworkTopologyReconciler(client ClusterClient, registrars []Registrar) *NetworkTopologyReconciler {
+func NewNetworkTopologyReconciler(client ClusterClient, registrar Registrar) *NetworkTopologyReconciler {
 	return &NetworkTopologyReconciler{
-		client:     client,
-		registrars: registrars,
+		client:    client,
+		registrar: registrar,
 	}
 }
 
@@ -103,25 +103,23 @@ func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster
 		_ = r.client.UpdateStatus(ctx, cluster)
 	}()
 
-	for _, reg := range r.registrars {
-		err = reg.Register(ctx, cluster)
-		if err != nil {
-			if errors.Is(err, &registrar.ModeNotSupportedError{}) {
-				capiconditions.MarkFalse(cluster, networkTopologyCondition, "ModeNotSupported", capi.ConditionSeverityInfo, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation))
-				return ctrl.Result{Requeue: false}, nil
-			} else if errors.Is(err, &registrar.TransitGatewayNotAvailableError{}) {
-				capiconditions.MarkFalse(cluster, networkTopologyCondition, "TransitGatewayNotAvailable", capi.ConditionSeverityWarning, "The transit gateway is not yet available for attachment")
-				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
-			} else if errors.Is(err, &registrar.VPCNotReadyError{}) {
-				capiconditions.MarkFalse(cluster, networkTopologyCondition, "VPCNotReady", capi.ConditionSeverityInfo, "The cluster's VPC is not yet ready")
-				return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
-			} else if errors.Is(err, &registrar.IDNotProvidedError{}) {
-				capiconditions.MarkFalse(cluster, networkTopologyCondition, "RequiredIDMissing", capi.ConditionSeverityError, "The %s ID is missing from the annotations", err.(*registrar.IDNotProvidedError).ID)
-				return ctrl.Result{Requeue: false}, nil
-			}
-
-			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, microerror.Mask(err)
+	err = r.registrar.Register(ctx, cluster)
+	if err != nil {
+		if errors.Is(err, &registrar.ModeNotSupportedError{}) {
+			capiconditions.MarkFalse(cluster, networkTopologyCondition, "ModeNotSupported", capi.ConditionSeverityInfo, "The provided mode '%s' is not supported", nettopAnnotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation))
+			return ctrl.Result{Requeue: false}, nil
+		} else if errors.Is(err, &registrar.TransitGatewayNotAvailableError{}) {
+			capiconditions.MarkFalse(cluster, networkTopologyCondition, "TransitGatewayNotAvailable", capi.ConditionSeverityWarning, "The transit gateway is not yet available for attachment")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
+		} else if errors.Is(err, &registrar.VPCNotReadyError{}) {
+			capiconditions.MarkFalse(cluster, networkTopologyCondition, "VPCNotReady", capi.ConditionSeverityInfo, "The cluster's VPC is not yet ready")
+			return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 1}, nil
+		} else if errors.Is(err, &registrar.IDNotProvidedError{}) {
+			capiconditions.MarkFalse(cluster, networkTopologyCondition, "RequiredIDMissing", capi.ConditionSeverityError, "The %s ID is missing from the annotations", err.(*registrar.IDNotProvidedError).ID)
+			return ctrl.Result{Requeue: false}, nil
 		}
+
+		return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, microerror.Mask(err)
 	}
 
 	capiconditions.MarkTrue(cluster, networkTopologyCondition)
@@ -133,16 +131,12 @@ func (r *NetworkTopologyReconciler) reconcileDelete(ctx context.Context, cluster
 		return ctrl.Result{}, nil
 	}
 
-	for i := range r.registrars {
-		registrar := r.registrars[len(r.registrars)-1-i]
-
-		err := registrar.Unregister(ctx, cluster)
-		if err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
+	err := r.registrar.Unregister(ctx, cluster)
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	err := r.client.RemoveFinalizer(ctx, cluster, FinalizerNetTop)
+	err = r.client.RemoveFinalizer(ctx, cluster, FinalizerNetTop)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}

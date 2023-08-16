@@ -125,9 +125,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		fakeRegistrar = new(controllersfakes.FakeRegistrar)
 		reconciler = controllers.NewNetworkTopologyReconciler(
 			clusterClient,
-			[]controllers.Registrar{
-				fakeRegistrar,
-			},
+			fakeRegistrar,
 		)
 
 		{
@@ -256,9 +254,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		BeforeEach(func() {
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
-				[]controllers.Registrar{
-					registrar.NewTransitGateway(new(awsfakes.FakeTransitGatewayClient), clusterClient, nil),
-				},
+				registrar.NewTransitGateway(new(awsfakes.FakeTransitGatewayClient), clusterClient, nil),
 			)
 
 			patchedCluster := cluster.DeepCopy()
@@ -302,9 +298,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 		BeforeEach(func() {
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
-				[]controllers.Registrar{
-					registrar.NewTransitGateway(new(awsfakes.FakeTransitGatewayClient), clusterClient, nil),
-				},
+				registrar.NewTransitGateway(new(awsfakes.FakeTransitGatewayClient), clusterClient, nil),
 			)
 
 			patchedCluster := cluster.DeepCopy()
@@ -368,9 +362,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
-				[]controllers.Registrar{
-					registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-				},
+				registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 			)
 
 			patchedCluster := cluster.DeepCopy()
@@ -473,9 +465,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 				reconciler = controllers.NewNetworkTopologyReconciler(
 					clusterClient,
-					[]controllers.Registrar{
-						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-					},
+					registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 				)
 
 				request = ctrl.Request{
@@ -626,9 +616,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 				reconciler = controllers.NewNetworkTopologyReconciler(
 					clusterClient,
-					[]controllers.Registrar{
-						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-					},
+					registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 				)
 
 				request = ctrl.Request{
@@ -773,9 +761,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 				reconciler = controllers.NewNetworkTopologyReconciler(
 					clusterClient,
-					[]controllers.Registrar{
-						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-					},
+					registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 				)
 
 				request = ctrl.Request{
@@ -837,9 +823,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 			reconciler = controllers.NewNetworkTopologyReconciler(
 				clusterClient,
-				[]controllers.Registrar{
-					registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-				},
+				registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 			)
 
 			patchedCluster := cluster.DeepCopy()
@@ -980,9 +964,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1110,9 +1092,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1248,9 +1228,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1347,9 +1325,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1461,9 +1437,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1585,9 +1559,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1709,9 +1681,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1766,9 +1736,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1827,9 +1795,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
@@ -1926,9 +1892,7 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 					reconciler = controllers.NewNetworkTopologyReconciler(
 						clusterClient,
-						[]controllers.Registrar{
-							registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
-						},
+						registrar.NewTransitGateway(transitGatewayClient, clusterClient, getTransitGatewayClientForWorkloadCluster),
 					)
 
 					request = ctrl.Request{
