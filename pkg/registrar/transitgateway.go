@@ -73,6 +73,10 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 	}
 
 	switch val := annotations.GetAnnotation(cluster, annotation.NetworkTopologyModeAnnotation); val {
+
+	// TODO: this case doesn't add any value. It should be removed and we
+	// should filter resources that have the annotation when setting up the
+	// reconciler
 	case "":
 		// If no value currently set, we'll set to the default of 'None"
 		logger.Info("NetworkTopologyMode is currently unset, setting to the default of 'None'")

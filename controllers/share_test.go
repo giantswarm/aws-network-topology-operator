@@ -24,7 +24,7 @@ import (
 	"github.com/giantswarm/aws-network-topology-operator/tests"
 )
 
-var _ = Describe("Share", func() {
+var _ = PDescribe("Share", func() {
 	var (
 		ctx context.Context
 

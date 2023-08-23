@@ -68,19 +68,10 @@ func (g *Cluster) Patch(ctx context.Context, cluster *capi.Cluster, patch client
 }
 
 // AddFinalizer adds the given finalizer to the cluster
-func (g *Cluster) AddFinalizer(ctx context.Context, capiCluster *capi.Cluster, finalizer string) error {
+func (g *Cluster) AddFinalizer(ctx context.Context, capiCluster *capa.AWSCluster, finalizer string) error {
 	originalCluster := capiCluster.DeepCopy()
 	controllerutil.AddFinalizer(capiCluster, finalizer)
-	if err := g.Client.Patch(ctx, capiCluster, client.MergeFrom(originalCluster)); err != nil {
-		return err
-	}
-	capaCluster, err := g.GetAWSCluster(ctx, types.NamespacedName{Name: capiCluster.Name, Namespace: capiCluster.Namespace})
-	if err != nil {
-		return err
-	}
-	originalCAPACluster := capaCluster.DeepCopy()
-	controllerutil.AddFinalizer(capaCluster, finalizer)
-	return g.Client.Patch(ctx, capaCluster, client.MergeFrom(originalCAPACluster))
+	return g.Client.Patch(ctx, capiCluster, client.MergeFrom(originalCluster))
 }
 
 // RemoveFinalizer removes the given finalizer from the cluster
@@ -125,6 +116,6 @@ func (g *Cluster) GetAWSClusterRoleIdentity(ctx context.Context, namespacedName 
 	return identity, microerror.Mask(err)
 }
 
-func (g *Cluster) UpdateStatus(ctx context.Context, cluster *capi.Cluster) error {
-	return g.Client.Status().Update(ctx, cluster)
+func (g *Cluster) UpdateStatus(ctx context.Context, obj client.Object) error {
+	return g.Client.Status().Update(ctx, obj)
 }

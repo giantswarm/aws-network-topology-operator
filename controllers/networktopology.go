@@ -6,12 +6,13 @@ import (
 
 	"github.com/giantswarm/microerror"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/giantswarm/aws-network-topology-operator/pkg/conditions"
@@ -25,12 +26,17 @@ const (
 
 //counterfeiter:generate . ClusterClient
 type ClusterClient interface {
-	Get(context.Context, types.NamespacedName) (*capi.Cluster, error)
-	AddFinalizer(context.Context, *capi.Cluster, string) error
+	Get(context.Context, k8stypes.NamespacedName) (*capi.Cluster, error)
+	AddFinalizer(context.Context, *capa.AWSCluster, string) error
 	RemoveFinalizer(context.Context, *capi.Cluster, string) error
 	ContainsFinalizer(*capi.Cluster, string) bool
-	UpdateStatus(ctx context.Context, cluster *capi.Cluster) error
-	GetAWSClusterRoleIdentity(context.Context, types.NamespacedName) (*capa.AWSClusterRoleIdentity, error)
+	UpdateStatus(context.Context, client.Object) error
+	GetAWSClusterRoleIdentity(context.Context, k8stypes.NamespacedName) (*capa.AWSClusterRoleIdentity, error)
+	Patch(ctx context.Context, cluster *capi.Cluster, patch client.Patch) (*capi.Cluster, error)
+	GetManagementCluster(ctx context.Context) (*capi.Cluster, error)
+	GetManagementClusterNamespacedName() k8stypes.NamespacedName
+	GetAWSCluster(ctx context.Context, namespacedName k8stypes.NamespacedName) (*capa.AWSCluster, error)
+	IsManagementCluster(ctx context.Context, cluster *capi.Cluster) bool
 }
 
 //counterfeiter:generate . Registrar
@@ -64,11 +70,11 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	defer logger.Info("Done reconciling")
 
 	cluster, err := r.client.Get(ctx, req.NamespacedName)
+	if k8sErrors.IsNotFound(err) {
+		logger.Info("Cluster no longer exists")
+		return ctrl.Result{}, nil
+	}
 	if err != nil {
-		if k8sErrors.IsNotFound(err) {
-			logger.Info("Cluster no longer exists")
-			return ctrl.Result{}, nil
-		}
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
@@ -92,21 +98,22 @@ func (r *NetworkTopologyReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 func (r *NetworkTopologyReconciler) reconcileNormal(ctx context.Context, cluster *capi.Cluster) (ctrl.Result, error) {
-	err := r.client.AddFinalizer(ctx, cluster, FinalizerNetTop)
-	if err != nil {
-		return ctrl.Result{}, microerror.Mask(err)
-	}
+	// err := r.client.AddFinalizer(ctx, cluster, FinalizerNetTop)
+	// if err != nil {
+	// 	return ctrl.Result{}, microerror.Mask(err)
+	// }
 
 	defer func() {
 		_ = r.client.UpdateStatus(ctx, cluster)
 	}()
 
-	err = r.registrar.Register(ctx, cluster)
+	err := r.registrar.Register(ctx, cluster)
 	if err != nil {
 		return markErrorConditions(cluster, err)
 	}
 
-	conditions.MarkReady(cluster)
+	conditions.MarkReady(cluster, conditions.NetworkTopologyCondition)
+	// TODO: like below - why?
 	return ctrl.Result{Requeue: true, RequeueAfter: time.Minute * 10}, nil
 }
 

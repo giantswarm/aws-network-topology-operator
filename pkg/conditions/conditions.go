@@ -8,14 +8,17 @@ import (
 	"github.com/giantswarm/aws-network-topology-operator/pkg/util/annotations"
 )
 
-const networkTopologyCondition capi.ConditionType = "NetworkTopologyReady"
+const (
+	NetworkTopologyCondition capi.ConditionType = "NetworkTopologyReady"
+	TransitGatewayCreated    capi.ConditionType = "TransitGatewayCreated"
+)
 
-func MarkReady(cluster *capi.Cluster) {
-	capiconditions.MarkTrue(cluster, networkTopologyCondition)
+func MarkReady(setter capiconditions.Setter, condition capi.ConditionType) {
+	capiconditions.MarkTrue(setter, condition)
 }
 
 func MarkModeNotSupported(cluster *capi.Cluster) {
-	capiconditions.MarkFalse(cluster, networkTopologyCondition,
+	capiconditions.MarkFalse(cluster, NetworkTopologyCondition,
 		"ModeNotSupported", capi.ConditionSeverityInfo,
 		"The provided mode '%s' is not supported",
 		annotations.GetAnnotation(cluster, gsannotation.NetworkTopologyModeAnnotation),
@@ -23,7 +26,7 @@ func MarkModeNotSupported(cluster *capi.Cluster) {
 }
 
 func MarkVPCNotReady(cluster *capi.Cluster) {
-	capiconditions.MarkFalse(cluster, networkTopologyCondition,
+	capiconditions.MarkFalse(cluster, NetworkTopologyCondition,
 		"VPCNotReady",
 		capi.ConditionSeverityInfo,
 		"The cluster's VPC is not yet ready",
@@ -31,7 +34,7 @@ func MarkVPCNotReady(cluster *capi.Cluster) {
 }
 
 func MarkIDNotProvided(cluster *capi.Cluster, id string) {
-	capiconditions.MarkFalse(cluster, networkTopologyCondition,
+	capiconditions.MarkFalse(cluster, NetworkTopologyCondition,
 		"RequiredIDMissing",
 		capi.ConditionSeverityError,
 		"The %s ID is missing from the annotations", id,
