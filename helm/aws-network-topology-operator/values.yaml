@@ -46,4 +46,3 @@ securityContext:
 global:
   podSecurityStandards:
     enforced: false
-
