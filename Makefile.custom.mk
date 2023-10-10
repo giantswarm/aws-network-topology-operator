@@ -99,6 +99,7 @@ deploy: manifests render ensure-deploy-envs ## Deploy controller to the K8s clus
 		--set aws.accessKeyID=$(AWS_ACCESS_KEY_ID) \
 		--set aws.secretAccessKey=$(AWS_SECRET_ACCESS_KEY) \
 		--set aws.region=$(AWS_REGION) \
+		--set global.podSecurityStandards.enforced=true \
 		--wait \
 		aws-network-topology-operator helm/rendered/aws-network-topology-operator
 
