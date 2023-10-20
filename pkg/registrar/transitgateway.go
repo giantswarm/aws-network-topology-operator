@@ -191,10 +191,6 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			}
 		}
 
-		if err := r.addRoutes(ctx, tgw.TransitGatewayId, &prefixListID, awsCluster); err != nil {
-			return err
-		}
-
 	case annotation.NetworkTopologyModeGiantSwarmManaged:
 		var err error
 		var tgw *types.TransitGateway
@@ -275,10 +271,6 @@ func (r *TransitGateway) Register(ctx context.Context, cluster *capi.Cluster) er
 			return err
 		}
 
-		if err := r.addRoutes(ctx, tgw.TransitGatewayId, &prefixListID, awsCluster); err != nil {
-			return err
-		}
-
 	default:
 		err := fmt.Errorf("invalid NetworkTopologyMode value")
 		logger.Error(err, "Unexpected NetworkTopologyMode annotation value found on cluster", "value", val)
@@ -329,10 +321,6 @@ func (r *TransitGateway) Unregister(ctx context.Context, cluster *capi.Cluster) 
 		}
 
 		if err := r.removeFromPrefixList(ctx, awsCluster); err != nil {
-			return err
-		}
-
-		if err := r.removeRoutes(ctx, awsCluster); err != nil {
 			return err
 		}
 
@@ -645,115 +633,6 @@ func (r *TransitGateway) getOrCreatePrefixList(ctx context.Context) (*types.Mana
 
 	logger.Info("Created new prefix list", "prefixListName", prefixListName)
 	return output.PrefixList, nil
-}
-
-func (r *TransitGateway) addRoutes(ctx context.Context, transitGatewayID, prefixListID *string, awsCluster *capa.AWSCluster) error {
-	logger := r.getLogger(ctx)
-
-	subnets := []string{}
-	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
-		subnets = append(subnets, s.ID)
-	}
-
-	// Creation of routes need to be made from the AWS account of the workload cluster
-	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
-		Name:      awsCluster.ObjectMeta.Name,
-		Namespace: awsCluster.ObjectMeta.Namespace,
-	})
-
-	output, err := transitGatewayAttachmentClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
-		Filters: []types.Filter{
-			{Name: awssdk.String("association.subnet-id"), Values: subnets},
-		},
-	})
-	if err != nil {
-		logger.Error(err, "Failed to get route tables")
-		return err
-	}
-
-	if output != nil && len(output.RouteTables) > 0 {
-		for _, rt := range output.RouteTables {
-			matchFound := false
-			for _, route := range rt.Routes {
-				if route.DestinationPrefixListId != nil && route.TransitGatewayId != nil && *route.DestinationPrefixListId == *prefixListID && *route.TransitGatewayId == *transitGatewayID {
-					// route already exists
-					matchFound = true
-				}
-			}
-			if matchFound {
-				continue
-			}
-
-			_, err = transitGatewayAttachmentClient.CreateRoute(ctx, &ec2.CreateRouteInput{
-				RouteTableId:            rt.RouteTableId,
-				DestinationPrefixListId: prefixListID,
-				TransitGatewayId:        transitGatewayID,
-			})
-			if err != nil {
-				logger.Error(err, "Failed to add route to route table", "routeTableID", rt.RouteTableId, "prefixListID", prefixListID, "transitGatewayID", transitGatewayID)
-				return err
-			}
-			logger.Info("Added routes to route table", "routeTableID", rt.RouteTableId, "prefixListID", prefixListID, "transitGatewayID", transitGatewayID)
-		}
-	}
-
-	return nil
-}
-
-func (r *TransitGateway) removeRoutes(ctx context.Context, awsCluster *capa.AWSCluster) error {
-	logger := r.getLogger(ctx)
-
-	prefixList, err := r.getOrCreatePrefixList(ctx)
-	if err != nil {
-		return err
-	}
-	prefixListID := *prefixList.PrefixListId
-
-	err = r.removeFromPrefixList(ctx, awsCluster)
-	if err != nil {
-		logger.Error(err, "Failed to remove CIDR from prefix list", "prefixListID", prefixListID, "cidr", awsCluster.Spec.NetworkSpec.VPC.CidrBlock)
-		return err
-	}
-
-	subnets := []string{}
-	for _, s := range awsCluster.Spec.NetworkSpec.Subnets {
-		subnets = append(subnets, s.ID)
-	}
-
-	// Creation of routes need to be made from the AWS account of the workload cluster
-	transitGatewayAttachmentClient := r.getTransitGatewayClientForWorkloadCluster(k8stypes.NamespacedName{
-		Name:      awsCluster.ObjectMeta.Name,
-		Namespace: awsCluster.ObjectMeta.Namespace,
-	})
-
-	output, err := transitGatewayAttachmentClient.DescribeRouteTables(ctx, &ec2.DescribeRouteTablesInput{
-		Filters: []types.Filter{
-			{Name: awssdk.String("association.subnet-id"), Values: subnets},
-		},
-	})
-	if err != nil {
-		logger.Error(err, "Failed to get route tables")
-		return err
-	}
-
-	if output != nil && len(output.RouteTables) > 0 {
-		for _, rt := range output.RouteTables {
-			_, err = transitGatewayAttachmentClient.DeleteRoute(ctx, &ec2.DeleteRouteInput{
-				RouteTableId:            rt.RouteTableId,
-				DestinationPrefixListId: &prefixListID,
-			})
-			if err != nil {
-				if aws.HasErrorCode(err, ErrRouteNotFound) {
-					logger.Info("Route to delete is not present, skipping...")
-					continue
-				}
-				logger.Error(err, "Failed to remove route from route table", "routeTableID", rt.RouteTableId, "prefixListID", prefixListID)
-				return err
-			}
-			logger.Info("Removed routes from route table", "routeTableID", rt.RouteTableId, "prefixListID", prefixListID)
-		}
-	}
-	return nil
 }
 
 func (r *TransitGateway) addToPrefixList(ctx context.Context, awsCluster *capa.AWSCluster) (*types.ManagedPrefixList, error) {
