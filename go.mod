@@ -86,15 +86,15 @@ require (
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
-	golang.org/x/crypto v0.11.0 // indirect
-	golang.org/x/mod v0.9.0 // indirect
-	golang.org/x/net v0.13.0 // indirect
+	golang.org/x/crypto v0.13.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
+	golang.org/x/net v0.15.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
-	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/term v0.10.0 // indirect
-	golang.org/x/text v0.11.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/term v0.12.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.7.0 // indirect
+	golang.org/x/tools v0.13.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
@@ -113,7 +113,7 @@ require (
 
 replace (
 	// Fix non CVE vulnerability: sonatype-2021-1401 in miekg/dns v1.0.14
-	github.com/miekg/dns => github.com/miekg/dns v1.1.50
+	github.com/miekg/dns => github.com/miekg/dns v1.1.56
 	// Fix non CVE vulnerability: sonatype-2019-0890 in pkg/sftp v1.10.1
 	github.com/pkg/sftp => github.com/pkg/sftp v1.13.5
 	// Fix for CWE-400: Uncontrolled Resource Consumption ('Resource Exhaustion')
