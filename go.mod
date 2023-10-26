@@ -1,6 +1,6 @@
 module github.com/giantswarm/aws-network-topology-operator
 
-go 1.18
+go 1.20
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.56.0
 
@@ -17,7 +17,7 @@ require (
 	github.com/giantswarm/microerror v0.4.0
 	github.com/go-logr/logr v1.2.4
 	github.com/google/uuid v1.4.0
-	github.com/maxbrunsfeld/counterfeiter/v6 v6.5.0
+	github.com/maxbrunsfeld/counterfeiter/v6 v6.7.0
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.29.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
