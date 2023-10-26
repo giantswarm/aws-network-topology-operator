@@ -1,6 +1,6 @@
 module github.com/giantswarm/aws-network-topology-operator
 
-go 1.18
+go 1.20
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.56.0
 
