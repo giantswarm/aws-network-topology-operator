@@ -98,30 +98,5 @@ var _ = Describe("Transit Gateways", func() {
 			"Description": PointTo(Equal(prefixListDescription)),
 		}))))
 
-		/*
-			By("creating a route in explicitly attached route tables")
-			getRouteTables := func() []*ec2.RouteTable {
-				subnets := []*string{}
-				for _, s := range managementAWSCluster.Spec.NetworkSpec.Subnets {
-					subnets = append(subnets, awssdk.String(s.ID))
-				}
-
-				routeTablesOutput, err := testFixture.EC2Client.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
-					Filters: []*ec2.Filter{
-						{Name: awssdk.String("association.subnet-id"), Values: subnets},
-					},
-				})
-				Expect(err).NotTo(HaveOccurred())
-				Expect(routeTablesOutput).NotTo(BeNil())
-
-				return routeTablesOutput.RouteTables
-			}
-			Eventually(getRouteTables).Should(ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
-				"Routes": ContainElement(PointTo(MatchFields(IgnoreExtras, Fields{
-					"DestinationPrefixListId": PointTo(Equal(prefixListID)),
-					"TransitGatewayId":        PointTo(Equal(transitGatewayID)),
-				}))),
-			}))))
-		*/
 	})
 })
