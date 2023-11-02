@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.22.1
 	github.com/aws/aws-sdk-go-v2/config v1.21.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.15.0
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.128.0
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.130.0
 	github.com/aws/aws-sdk-go-v2/service/sns v1.23.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.25.0
 	github.com/aws/smithy-go v1.16.0
