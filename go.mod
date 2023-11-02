@@ -5,7 +5,7 @@ go 1.20
 replace google.golang.org/grpc => google.golang.org/grpc v1.59.0
 
 require (
-	github.com/aws/aws-sdk-go v1.46.7
+	github.com/aws/aws-sdk-go v1.47.1
 	github.com/aws/aws-sdk-go-v2 v1.22.1
 	github.com/aws/aws-sdk-go-v2/config v1.19.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.43
