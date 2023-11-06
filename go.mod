@@ -117,5 +117,5 @@ replace (
 	// Fix non CVE vulnerability: sonatype-2019-0890 in pkg/sftp v1.10.1
 	github.com/pkg/sftp => github.com/pkg/sftp v1.13.6
 	// Fix for CWE-400: Uncontrolled Resource Consumption ('Resource Exhaustion')
-	golang.org/x/text => golang.org/x/text v0.13.0
+	golang.org/x/text => golang.org/x/text v0.14.0
 )
