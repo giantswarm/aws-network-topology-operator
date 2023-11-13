@@ -174,11 +174,11 @@ func (r *ShareReconciler) shareTransitGateway(ctx context.Context, cluster *capi
 		return nil
 	}
 
-	err = r.clusterClient.AddFinalizer(ctx, cluster, FinalizerResourceShare)
-	if err != nil {
-		logger.Error(err, "failed to add finalizer")
-		return err
-	}
+	// err = r.clusterClient.AddFinalizer(ctx, cluster, FinalizerResourceShare)
+	// if err != nil {
+	// 	logger.Error(err, "failed to add finalizer")
+	// 	return err
+	// }
 
 	err = r.ramClient.ApplyResourceShare(ctx, aws.ResourceShare{
 		Name: getResourceShareName(cluster, "transit-gateway"),

@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/scheme"
 	capa "sigs.k8s.io/cluster-api-provider-aws/api/v1beta1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -86,3 +87,48 @@ var _ = AfterEach(func() {
 	namespaceObj.Name = namespace
 	Expect(k8sClient.Delete(context.Background(), namespaceObj)).To(Succeed())
 })
+
+func newCluster(name string, annotationsKeyValues ...string) *capa.AWSCluster {
+	if len(annotationsKeyValues)%2 != 0 {
+		Fail("wrong number of arguments for newCluster. Expected even number of arguments for annotation key/value pairs")
+	}
+
+	annotations := map[string]string{}
+	for i := 0; i < len(annotationsKeyValues); i += 2 {
+		annotations[annotationsKeyValues[i]] = annotationsKeyValues[i+1]
+	}
+
+	vpcID := uuid.NewString()
+	awsCluster := &capa.AWSCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   namespace,
+			Annotations: annotations,
+		},
+		Spec: capa.AWSClusterSpec{
+			NetworkSpec: capa.NetworkSpec{
+				VPC: capa.VPCSpec{
+					ID: vpcID,
+				},
+				Subnets: capa.Subnets{
+					{
+						ID:       "sub-1",
+						IsPublic: false,
+					},
+				},
+			},
+		},
+	}
+
+	Expect(k8sClient.Create(context.Background(), awsCluster)).To(Succeed())
+	tests.PatchAWSClusterStatus(k8sClient, awsCluster, capa.AWSClusterStatus{
+		Ready: true,
+	})
+
+	return awsCluster
+}
+
+func newRandomCluster(annotationsKeyValues ...string) *capa.AWSCluster {
+	name := uuid.NewString()
+	return newCluster(name, annotationsKeyValues...)
+}

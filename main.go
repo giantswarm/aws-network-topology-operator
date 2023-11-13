@@ -149,10 +149,8 @@ func main() {
 		return aws.NewTGWClient(*ec2ServiceWorkloadCluster, *snsService)
 	}
 
-	registrars := []controllers.Registrar{
-		registrar.NewTransitGateway(aws.NewTGWClient(*ec2Service, *snsService), client, getTransitGatewayClientForWorkloadCluster),
-	}
-	controller := controllers.NewNetworkTopologyReconciler(client, registrars)
+	registrar := registrar.NewTransitGateway(aws.NewTGWClient(*ec2Service, *snsService), client, getTransitGatewayClientForWorkloadCluster)
+	controller := controllers.NewNetworkTopologyReconciler(client, registrar)
 	err = controller.SetupWithManager(mgr)
 	if err != nil {
 		setupLog.Error(err, "failed to setup controller", "controller", "Cluster")

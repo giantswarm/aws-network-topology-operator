@@ -1,6 +1,7 @@
 package registrar
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -18,8 +19,11 @@ func (e *ModeNotSupportedError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
 
-type TransitGatewayNotAvailableError struct {
+func IsModeNotSupportedError(err error) bool {
+	return errors.Is(err, &ModeNotSupportedError{})
 }
+
+type TransitGatewayNotAvailableError struct{}
 
 func (e *TransitGatewayNotAvailableError) Error() string {
 	return "transit gateway not available"
@@ -29,8 +33,11 @@ func (e *TransitGatewayNotAvailableError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
 }
 
-type VPCNotReadyError struct {
+func IsTransitGatewayNotAvailableError(err error) bool {
+	return errors.Is(err, &TransitGatewayNotAvailableError{})
 }
+
+type VPCNotReadyError struct{}
 
 func (e *VPCNotReadyError) Error() string {
 	return "transit gateway not available"
@@ -38,6 +45,10 @@ func (e *VPCNotReadyError) Error() string {
 
 func (e *VPCNotReadyError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}
+
+func IsVPCNotReadyError(err error) bool {
+	return errors.Is(err, &VPCNotReadyError{})
 }
 
 type IDNotProvidedError struct {
@@ -51,4 +62,8 @@ func (e *IDNotProvidedError) Error() string {
 
 func (e *IDNotProvidedError) Is(target error) bool {
 	return reflect.TypeOf(target) == reflect.TypeOf(e)
+}
+
+func IsIDNotProvidedError(err error) bool {
+	return errors.Is(err, &IDNotProvidedError{})
 }
