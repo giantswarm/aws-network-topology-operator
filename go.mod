@@ -114,7 +114,7 @@ require (
 
 replace (
 	// Fix non CVE vulnerability: sonatype-2021-1401 in miekg/dns v1.0.14
-	github.com/miekg/dns => github.com/miekg/dns v1.1.56
+	github.com/miekg/dns => github.com/miekg/dns v1.1.57
 	// Fix non CVE vulnerability: sonatype-2019-0890 in pkg/sftp v1.10.1
 	github.com/pkg/sftp => github.com/pkg/sftp v1.13.6
 	// Fix for CWE-400: Uncontrolled Resource Consumption ('Resource Exhaustion')
