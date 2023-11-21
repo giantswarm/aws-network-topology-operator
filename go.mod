@@ -2,7 +2,11 @@ module github.com/giantswarm/aws-network-topology-operator
 
 go 1.20
 
-replace google.golang.org/grpc => google.golang.org/grpc v1.59.0
+replace (
+	// Fixes CVE-2023-47108 in go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.46.0
+	google.golang.org/grpc => google.golang.org/grpc v1.59.0
+)
 
 require (
 	github.com/aws/aws-sdk-go v1.48.1
