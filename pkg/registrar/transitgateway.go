@@ -26,6 +26,7 @@ import (
 type contextKey string
 
 var clusterNameContextKey contextKey = "clusterName"
+var tagKey = "tag:"
 
 const (
 	// PREFIX_LIST_MAX_ENTRIES is the maximum number of entries a created prefix list can have.
@@ -735,9 +736,9 @@ func (r *TransitGateway) getTGWGAttachmentSubnetsOrDefault(ctx context.Context, 
 	result := make([]string, 0)
 	output, err := transitGatewayClient.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
 		Filters: []types.Filter{
-			{Name: awssdk.String("tag:" + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
-			{Name: awssdk.String("tag:" + SubnetTGWAttachementsLabel), Values: []string{"true"}},
-			{Name: awssdk.String("tag:" + SubnetRoleLabel), Values: []string{"private"}},
+			{Name: awssdk.String(tagKey + capa.NameKubernetesAWSCloudProviderPrefix + awsCluster.Name), Values: []string{"owned", "shared"}},
+			{Name: awssdk.String(tagKey + SubnetTGWAttachementsLabel), Values: []string{"true"}},
+			{Name: awssdk.String(tagKey + SubnetRoleLabel), Values: []string{"private"}},
 		},
 	})
 	if err != nil {
