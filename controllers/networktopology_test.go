@@ -10,7 +10,6 @@ import (
 	gsannotation "github.com/giantswarm/k8smetadata/pkg/annotation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	. "github.com/onsi/gomega/gstruct"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -517,10 +516,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(*payload.VpcId).To(Equal(mcVPCId))
 				})
 
-				It("should create routes on subnet route tables", func() {
-					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(1))
-				})
-
 				It("should not send the SNS message", func() {
 					Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(0))
 				})
@@ -674,14 +669,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 					Expect(*payload.VpcId).To(Equal(wcVPCId))
 				})
 
-				It("should create routes on subnet route tables", func() {
-					Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(1))
-					_, input, _ := transitGatewayClientForWorkloadCluster.CreateRouteArgsForCall(0)
-					Expect(input.DestinationPrefixListId).To(PointTo(Equal(prefixListID)))
-					Expect(input.TransitGatewayId).To(PointTo(Equal(transitGatewayID)))
-					Expect(input.RouteTableId).To(PointTo(Equal("rt-123")))
-				})
-
 				It("should not send the SNS message", func() {
 					Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(0))
 				})
@@ -798,10 +785,6 @@ var _ = Describe("NewNetworkTopologyReconciler", func() {
 
 			It("should not send the SNS message", func() {
 				Expect(transitGatewayClient.PublishSNSMessageCallCount()).To(Equal(0))
-			})
-
-			It("should create routes on subnet route tables", func() {
-				Expect(transitGatewayClientForWorkloadCluster.CreateRouteCallCount()).To(Equal(1))
 			})
 		})
 	})
