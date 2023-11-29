@@ -55,7 +55,6 @@ workflows:
           requires:
             - unit-tests
             - integration-tests
-            - acceptance-tests
           filters:
             tags:
               only: /^v.*/
