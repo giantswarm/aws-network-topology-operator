@@ -3,7 +3,7 @@ project:
   commit: "[[ .SHA ]]"
 
 image:
-  registry: docker.io
+  registry: gsoci.azurecr.io
   name: giantswarm/aws-network-topology-operator
   tag: "[[ .Version ]]"
   pullPolicy: IfNotPresent
@@ -41,7 +41,7 @@ securityContext:
     type: RuntimeDefault
   capabilities:
     drop:
-    - ALL
+      - ALL
 
 global:
   podSecurityStandards:
